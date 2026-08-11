@@ -1,20 +1,14 @@
 import { db } from "@/lib/db";
 import type { SessionData } from "@/lib/session";
-import { validationError } from "./errors";
+import {
+  DEFAULT_PAGE_SIZE,
+  PAGE_SIZES,
+  type ActivityFilters,
+} from "@/lib/activity-query";
 import type { ActivityLogWhereInput } from "@/generated/prisma/models/ActivityLog";
 
-const DEFAULT_PAGE_SIZE = 25;
-const PAGE_SIZES = [10, 25, 50, 100] as const;
-
-export type ActivityFilters = {
-  action?: string;
-  subjectType?: string;
-  q?: string;
-  from?: string;
-  to?: string;
-  page?: number;
-  pageSize?: number;
-};
+export type { ActivityFilters };
+export { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseActivityQuery } from "@/lib/activity-query";
 
 function buildWhere(query: ActivityFilters): ActivityLogWhereInput {
   const where: ActivityLogWhereInput = {};
@@ -28,12 +22,12 @@ function buildWhere(query: ActivityFilters): ActivityLogWhereInput {
   const q = query.q?.trim() ?? "";
   if (q) {
     where.OR = [
-      { action: { contains: q } },
-      { subjectType: { contains: q } },
-      { subjectId: { contains: q } },
-      { ipAddress: { contains: q } },
-      { user: { name: { contains: q } } },
-      { user: { email: { contains: q } } },
+      { action: { contains: q, mode: "insensitive" } },
+      { subjectType: { contains: q, mode: "insensitive" } },
+      { subjectId: { contains: q, mode: "insensitive" } },
+      { ipAddress: { contains: q, mode: "insensitive" } },
+      { user: { name: { contains: q, mode: "insensitive" } } },
+      { user: { email: { contains: q, mode: "insensitive" } } },
     ];
   }
 
@@ -109,8 +103,8 @@ export async function activityStats() {
       where: {
         createdAt: { gte: weekAgo },
         OR: [
-          { action: { contains: "failed" } },
-          { action: { contains: "rate_limited" } },
+          { action: { contains: "failed", mode: "insensitive" } },
+          { action: { contains: "rate_limited", mode: "insensitive" } },
         ],
       },
     }),
@@ -169,36 +163,4 @@ export async function exportActivity(
   }));
 }
 
-export function parseActivityQuery(searchParams: URLSearchParams): ActivityFilters {
-  const rawPage = Number(searchParams.get("page") ?? "1");
-  const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;
-  const rawSize = Number(searchParams.get("pageSize") ?? String(DEFAULT_PAGE_SIZE));
-  const pageSize = (PAGE_SIZES as readonly number[]).includes(rawSize)
-    ? rawSize
-    : DEFAULT_PAGE_SIZE;
 
-  const action = searchParams.get("action")?.trim() ?? "";
-  if (action && !/^[a-z][a-z0-9_.-]*$/i.test(action)) {
-    throw validationError("Invalid action filter.");
-  }
-
-  const subjectType = searchParams.get("subjectType")?.trim() ?? "";
-  if (subjectType && !/^[A-Za-z][A-Za-z0-9_]*$/.test(subjectType)) {
-    throw validationError("Invalid subject type filter.");
-  }
-
-  const q = (searchParams.get("q") ?? "").trim().slice(0, 100);
-  const from = (searchParams.get("from") ?? "").trim();
-  const to = (searchParams.get("to") ?? "").trim();
-
-  if (from && Number.isNaN(Date.parse(from))) {
-    throw validationError("Invalid from date.");
-  }
-  if (to && Number.isNaN(Date.parse(to))) {
-    throw validationError("Invalid to date.");
-  }
-
-  return { action, subjectType, q, from, to, page, pageSize };
-}
-
-export { PAGE_SIZES, DEFAULT_PAGE_SIZE };

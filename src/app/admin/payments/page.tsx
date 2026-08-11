@@ -50,10 +50,18 @@ export default async function AdminPaymentsPage({
       ...(q
         ? {
             OR: [
-              { reference: { contains: q } },
-              { booking: { user: { name: { contains: q } } } },
-              { booking: { user: { studentIdNumber: { contains: q } } } },
-              { booking: { room: { hostel: { name: { contains: q } } } } },
+              { reference: { contains: q, mode: "insensitive" } },
+              { booking: { user: { name: { contains: q, mode: "insensitive" } } } },
+              {
+                booking: {
+                  user: { studentIdNumber: { contains: q, mode: "insensitive" } },
+                },
+              },
+              {
+                booking: {
+                  room: { hostel: { name: { contains: q, mode: "insensitive" } } },
+                },
+              },
             ],
           }
         : {}),

@@ -48,10 +48,10 @@ export default async function AdminBookingsPage({
       ...(q
         ? {
             OR: [
-              { user: { name: { contains: q } } },
-              { user: { studentIdNumber: { contains: q } } },
-              { room: { roomNumber: { contains: q } } },
-              { room: { hostel: { name: { contains: q } } } },
+              { user: { name: { contains: q, mode: "insensitive" } } },
+              { user: { studentIdNumber: { contains: q, mode: "insensitive" } } },
+              { room: { roomNumber: { contains: q, mode: "insensitive" } } },
+              { room: { hostel: { name: { contains: q, mode: "insensitive" } } } },
             ],
           }
         : {}),

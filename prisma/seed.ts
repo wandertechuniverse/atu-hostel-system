@@ -1,14 +1,11 @@
 // Demo seed - see docs/03-data-model.md §4 for the dataset rationale.
 // Hostel photos (public/hostels/*.jpg) are real Accra location photographs
 // from Wikimedia Commons, CC BY-SA 4.0 - see docs/14-image-credits.md.
-import { PrismaClient } from "../src/generated/prisma/client";
-import { PrismaLibSql } from "@prisma/adapter-libsql";
+import "dotenv/config";
 import bcrypt from "bcryptjs";
+import { createPrismaClient } from "../src/lib/prisma-client";
 
-const adapter = new PrismaLibSql({
-  url: process.env.DATABASE_URL ?? "file:./dev.db",
-});
-const db = new PrismaClient({ adapter });
+const db = createPrismaClient();
 
 async function main() {
   // Reset so re-seeding is deterministic (development only).

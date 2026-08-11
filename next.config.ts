@@ -9,15 +9,8 @@ const nextConfig: NextConfig = {
   // hydration (sidebar, dialogs, streamed content). "localhost" is allowed by
   // default; 127.0.0.1 must be added explicitly.
   allowedDevOrigins: ["127.0.0.1", "localhost"],
-  // Ship the build-time demo SQLite into every serverless function so /tmp can
-  // be seeded on cold start (Netlify production without a remote Turso URL).
-  outputFileTracingIncludes: {
-    "/*": ["./data/**/*", "./data/demo.db", "./prisma/demo.seed.db"],
-    "/api/**/*": ["./data/**/*", "./data/demo.db", "./prisma/demo.seed.db"],
-    "/login": ["./data/**/*", "./data/demo.db", "./prisma/demo.seed.db"],
-    "/admin/**/*": ["./data/**/*", "./data/demo.db", "./prisma/demo.seed.db"],
-  },
-  serverExternalPackages: ["@libsql/client", "@prisma/adapter-libsql"],
+  // pg / Neon must be externalized for serverless bundling.
+  serverExternalPackages: ["pg", "@prisma/adapter-pg"],
   // The Playwright e2e suite starts a second dev server (port 3100) against a
   // dedicated test database. It must not share the preview server's .next
   // cache, so allow an env-driven distDir override.

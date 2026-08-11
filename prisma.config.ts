@@ -10,6 +10,7 @@ export default defineConfig({
     seed: "bun prisma/seed.ts",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // Neon: use DIRECT_URL for migrate/push when available (non-pooled).
+    url: process.env["DIRECT_URL"] ?? process.env["DATABASE_URL"],
   },
 });

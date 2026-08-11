@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { bookingRequestSchema, updateProfileSchema } from "@/lib/validation";
-import { parseActivityQuery } from "@/lib/services/activity";
+import { parseActivityQuery } from "@/lib/activity-query";
 
 describe("updateProfileSchema (FR-9)", () => {
   it("accepts a valid student profile", () => {

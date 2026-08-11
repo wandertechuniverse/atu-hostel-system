@@ -6,7 +6,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  // Neon (or any Postgres). Set DATABASE_URL in .env / Netlify.
+  // Pooled Neon URL for the app; optional DIRECT_URL for migrations (prisma.config).
+  provider = "postgresql"
 }
 
 enum Role {
