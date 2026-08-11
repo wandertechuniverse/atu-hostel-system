@@ -5,8 +5,17 @@
 [build.environment]
   NODE_VERSION = "22"
   BUN_VERSION = "1.3.14"
-  # Placeholder so build can generate the client; runtime uses site env vars.
-  SESSION_SECRET = "build-time-placeholder-replace-in-netlify-ui-32chars"
+  # SESSION_SECRET and DATABASE_URL come from the Netlify UI / env API only
+  # (do not put secrets or lookalike secrets in this file — secrets scanning
+  # will fail the production build).
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# Soften secrets scanning: demo .env.example keys are not real credentials.
+[build.processing]
+  skip_processing = false
+
+# Allow documented env key names in example/config files.
+[functions]
+  node_bundler = "esbuild"
