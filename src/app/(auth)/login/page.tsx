@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getSession, homeForRole } from "@/lib/auth";
+import { ensureDemoData } from "@/lib/ensure-demo-data";
 import { LoginForm } from "@/components/auth/login-form";
 
 export const metadata: Metadata = {
@@ -19,6 +20,13 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ reset?: string }>;
 }) {
+  // Plant demo accounts if this serverless instance booted an empty DB.
+  try {
+    await ensureDemoData();
+  } catch (error) {
+    console.error("[login-page] ensureDemoData:", error);
+  }
+
   const session = await getSession();
   // Redirect only when the session's account still exists and is active. A stale
   // cookie (user reseeded/deleted) otherwise loops: /login -> /admin -> /login.

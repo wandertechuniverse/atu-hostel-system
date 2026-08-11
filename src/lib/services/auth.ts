@@ -72,14 +72,24 @@ export async function loginUser(input: { email: unknown; password: unknown }, ip
     throw validationError(parsed.error.issues[0]?.message ?? "Invalid input");
   }
 
+  // Serverless cold starts may boot an empty /tmp DB — plant demo accounts.
+  const { ensureDemoData } = await import("@/lib/ensure-demo-data");
+  try {
+    await ensureDemoData();
+  } catch (error) {
+    console.error("[login] ensureDemoData failed:", error);
+  }
+
+  const email = parsed.data.email.trim().toLowerCase();
+
   // Throttle per email+IP: 5 failed attempts per minute (SECURITY.md §3).
-  const key = `login:${parsed.data.email.toLowerCase()}|${ip}`;
+  const key = `login:${email}|${ip}`;
   if (!checkRateLimit(key)) {
     await audit({ action: "auth.rate_limited", subjectType: "User", ipAddress: ip });
     throw rateLimitedError("Too many login attempts. Please wait a minute and try again.");
   }
 
-  const user = await verifyCredentials(parsed.data.email, parsed.data.password);
+  const user = await verifyCredentials(email, parsed.data.password);
   if (!user) {
     await audit({ action: "auth.login_failed", subjectType: "User", ipAddress: ip });
     throw unauthenticatedError("Invalid email or password");
@@ -104,7 +114,10 @@ export async function registerUser(input: {
     throw validationError(parsed.error.issues[0]?.message ?? "Invalid input");
   }
 
-  const { name, email, phone, password } = parsed.data;
+  const name = parsed.data.name;
+  const email = parsed.data.email.trim().toLowerCase();
+  const phone = parsed.data.phone;
+  const password = parsed.data.password;
   const studentIdNumber = parsed.data.studentIdNumber?.trim() || null;
 
   const existing = await db.user.findUnique({ where: { email } });

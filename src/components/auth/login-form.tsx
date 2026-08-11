@@ -22,7 +22,16 @@ export function LoginForm() {
       <CsrfInput />
       <div className="space-y-1.5">
         <Label htmlFor="email">Email</Label>
-        <Input id="email" name="email" type="email" autoComplete="email" required />
+        <Input
+          id="email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          required
+        />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="password">Password</Label>

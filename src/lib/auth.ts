@@ -68,7 +68,14 @@ export function homeForRole(role: SessionData["role"]) {
 }
 
 export async function verifyCredentials(email: string, password: string) {
-  const user = await db.user.findUnique({ where: { email } });
+  // Normalize so "Admin@ATU.edu.gh " still matches the seeded account.
+  const normalized = email.trim().toLowerCase();
+  const user =
+    (await db.user.findUnique({ where: { email: normalized } })) ??
+    // Fallback for older rows stored with mixed case before normalization.
+    (await db.user.findFirst({
+      where: { email: { equals: normalized } },
+    }));
   if (!user) return null;
   if (!user.isActive) return null;
   const ok = await bcrypt.compare(password, user.password);
