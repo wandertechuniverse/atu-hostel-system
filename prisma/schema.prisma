@@ -1,0 +1,155 @@
+// HBMS schema - see docs/03-data-model.md in the repository root.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  STUDENT
+  MANAGER
+  ADMIN
+}
+
+enum HostelType {
+  UNIVERSITY
+  PRIVATE
+}
+
+enum RoomStatus {
+  AVAILABLE
+  MAINTENANCE
+  CLOSED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model User {
+  id               String               @id @default(uuid())
+  name             String
+  studentIdNumber  String?              @unique
+  email            String               @unique
+  phone            String
+  department       String?
+  role             Role                 @default(STUDENT)
+  hostelId         String?              @unique // one manager per hostel; null for students/admins
+  hostel           Hostel?              @relation(fields: [hostelId], references: [id])
+  password         String
+  isActive         Boolean              @default(true)
+  emailVerifiedAt  DateTime?
+  bookings         Booking[]
+  logs             ActivityLog[]
+  resetTokens      PasswordResetToken[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+}
+
+/// One-time password reset tokens (forgot-password flow). Only the SHA-256
+/// hash is stored, never the token itself; the token dies on use or expiry.
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Hostel {
+  id            String      @id @default(uuid())
+  name          String
+  location      String
+  contactNumber String?
+  description   String?
+  type          HostelType  @default(UNIVERSITY)
+  facilities    String?
+  featuredImage String?
+  latitude      Float?      // for the OpenStreetMap view
+  longitude     Float?
+  isApproved    Boolean     @default(false)
+  manager       User?
+  rooms         Room[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Room {
+  id               String        @id @default(uuid())
+  hostelId         String
+  hostel           Hostel        @relation(fields: [hostelId], references: [id], onDelete: Cascade)
+  roomNumber       String
+  roomType         String
+  capacity         Int
+  pricePerSemester Float
+  status           RoomStatus    @default(AVAILABLE)
+  description      String?
+  bookings         Booking[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@unique([hostelId, roomNumber])
+  @@index([hostelId])
+  @@index([status])
+}
+
+model Booking {
+  id              String        @id @default(uuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  roomId          String
+  room            Room          @relation(fields: [roomId], references: [id])
+  bookingDate     DateTime      @default(now())
+  academicSession String
+  status          BookingStatus @default(PENDING)
+  amount          Float
+  notes           String?
+  payment         Payment?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([roomId])
+  @@index([roomId, status])
+}
+
+model Payment {
+  id              String        @id @default(uuid())
+  bookingId       String        @unique
+  booking         Booking       @relation(fields: [bookingId], references: [id])
+  reference       String        @unique
+  amountPaid      Float
+  paymentDate     DateTime?
+  status          PaymentStatus @default(PENDING)
+  method          String        @default("mock")
+  gatewayResponse String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model ActivityLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  action      String
+  subjectType String?
+  subjectId   String?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+}

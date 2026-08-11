@@ -1,0 +1,1100 @@
+openapi: 3.1.0
+info:
+  title: HBMS API
+  version: 1.0.0
+  description: >
+    ATU Hostel Booking Management System - REST API. Auth is the iron-session
+    `hbms_session` cookie set by /api/auth/login and /api/auth/register.
+    Success responses use a `{ data }` envelope; failures use
+    `{ error: { code, message } }`. See docs/11-api.md.
+servers:
+  - url: http://localhost:3000/api
+    description: Local dev server
+tags:
+  - name: Auth
+  - name: Hostels
+  - name: Rooms
+  - name: Bookings
+  - name: Payments
+  - name: Users
+  - name: Activity
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: hbms_session
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [VALIDATION, UNAUTHENTICATED, FORBIDDEN, NOT_FOUND, CONFLICT, RATE_LIMITED, INTERNAL]
+            message:
+              type: string
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string }
+        phone: { type: string }
+        studentIdNumber: { type: [string, "null"] }
+        department: { type: [string, "null"] }
+        role: { type: string, enum: [STUDENT, MANAGER, ADMIN] }
+        isActive: { type: boolean }
+        hostelId: { type: [string, "null"] }
+    Hostel:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        type: { type: string, enum: [UNIVERSITY, PRIVATE] }
+        location: { type: string }
+        contactNumber: { type: [string, "null"] }
+        description: { type: [string, "null"] }
+        facilities: { type: [string, "null"] }
+        featuredImage: { type: [string, "null"] }
+        latitude: { type: [number, "null"], description: "Map pin latitude (Adabraka ~5.5629)" }
+        longitude: { type: [number, "null"], description: "Map pin longitude (Adabraka ~-0.2219)" }
+        isApproved: { type: boolean }
+        manager:
+          type: [object, "null"]
+          properties:
+            id: { type: string }
+            name: { type: string }
+        rooms:
+          type: array
+          items: { $ref: "#/components/schemas/Room" }
+    Room:
+      type: object
+      properties:
+        id: { type: string }
+        hostelId: { type: string }
+        roomNumber: { type: string }
+        roomType: { type: string }
+        capacity: { type: integer }
+        pricePerSemester: { type: number }
+        status: { type: string, enum: [AVAILABLE, MAINTENANCE, CLOSED] }
+        description: { type: [string, "null"] }
+        available: { type: integer, description: "Derived beds left (capacity - confirmed bookings)" }
+    Booking:
+      type: object
+      properties:
+        id: { type: string }
+        userId: { type: string }
+        academicSession: { type: string }
+        status: { type: string, enum: [PENDING, CONFIRMED, CANCELLED, COMPLETED] }
+        amount: { type: number }
+        room:
+          type: object
+          properties:
+            id: { type: string }
+            roomNumber: { type: string }
+            roomType: { type: string }
+            hostel:
+              type: object
+              properties:
+                id: { type: string }
+                name: { type: string }
+        payment:
+          type: [object, "null"]
+          properties:
+            id: { type: string }
+            reference: { type: string }
+            status: { type: string, enum: [PENDING, SUCCESS, FAILED] }
+            method: { type: string }
+    Payment:
+      type: object
+      properties:
+        id: { type: string }
+        bookingId: { type: string }
+        reference: { type: string }
+        amountPaid: { type: number }
+        status: { type: string, enum: [PENDING, SUCCESS, FAILED] }
+        method: { type: string }
+        paymentDate: { type: [string, "null"], format: date-time }
+    ActivityEntry:
+      type: object
+      properties:
+        id: { type: string }
+        action: { type: string }
+        user:
+          type: [object, "null"]
+          properties:
+            id: { type: string }
+            name: { type: string }
+            email: { type: string }
+        subjectType: { type: [string, "null"] }
+        subjectId: { type: [string, "null"] }
+        ipAddress: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+    HostelInput:
+      type: object
+      required: [name, type, location]
+      properties:
+        name: { type: string, minLength: 3, maxLength: 100 }
+        type: { type: string, enum: [UNIVERSITY, PRIVATE] }
+        location: { type: string, minLength: 3, maxLength: 120 }
+        contactNumber: { type: string, maxLength: 20 }
+        description: { type: string, maxLength: 1000 }
+        facilities:
+          type: array
+          items: { type: string }
+          maxItems: 12
+        latitude:
+          type: [number, "null"]
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: [number, "null"]
+          minimum: -180
+          maximum: 180
+    RoomInput:
+      type: object
+      required: [roomNumber, roomType, capacity, pricePerSemester, status]
+      properties:
+        roomNumber: { type: string, maxLength: 10 }
+        roomType: { type: string, maxLength: 30 }
+        capacity: { type: integer, minimum: 1, maximum: 20 }
+        pricePerSemester: { type: number, minimum: 0, maximum: 100000 }
+        status: { type: string, enum: [AVAILABLE, MAINTENANCE, CLOSED] }
+        description: { type: string, maxLength: 500 }
+  responses:
+    Unauthorized:
+      description: No valid session
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Role or scope not allowed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ValidationError:
+      description: Malformed JSON or a field failed validation
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: The resource does not exist
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+security:
+  - cookieAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [Auth]
+      summary: Liveness probe
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      status: { type: string }
+                      service: { type: string }
+                      time: { type: string, format: date-time }
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Create a student account and sign it in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, phone, password]
+              properties:
+                name: { type: string }
+                email: { type: string, format: email }
+                studentIdNumber: { type: string }
+                phone: { type: string }
+                password: { type: string, minLength: 8 }
+      responses:
+        "201": { description: Created }
+        "400": { $ref: "#/components/responses/Forbidden" }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Verify credentials and set the session cookie
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      user: { $ref: "#/components/schemas/User" }
+                      home: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429":
+          description: Too many attempts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Destroy the session
+      responses:
+        "204": { description: No content }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Current signed-in user
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      user: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/change-password:
+    post:
+      tags: [Auth]
+      summary: Change your own password after verifying the current one (FR-9)
+      description: >-
+        Any signed-in role. The current password is verified with bcrypt
+        before the new one is accepted; the confirm check runs server-side.
+        An auth.password_changed audit entry is written.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                currentPassword: { type: string }
+                newPassword: { type: string, minLength: 8, maxLength: 72 }
+                confirmPassword: { type: string }
+              required: [currentPassword, newPassword, confirmPassword]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      ok: { type: boolean, example: true }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request a password reset link (public)
+      security: []
+      description: >-
+        Issues a single-use, 30-minute reset token and mails the link
+        (console mailer in this build). The response is identical whether or
+        not the account exists (no user enumeration). In development it also
+        carries devResetUrl so the demo needs no SMTP. Throttled per email+IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "200":
+          description: OK - generic success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      devResetUrl: { type: [string, "null"], nullable: true }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "429":
+          description: Too many reset requests
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Redeem the reset token and set a new password (public)
+      security: []
+      description: >-
+        Only the token's SHA-256 hash is stored, so a database leak cannot be
+        replayed. Invalid or expired tokens get a generic 400; success
+        re-hashes the password at the same cost as registration and deletes
+        the token (single use). Audits auth.password_reset. Throttled per
+        token+IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword, confirmPassword]
+              properties:
+                token: { type: string }
+                newPassword: { type: string, minLength: 8, maxLength: 72 }
+                confirmPassword: { type: string }
+      responses:
+        "200":
+          description: OK - password reset
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      ok: { type: boolean, example: true }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "429":
+          description: Too many reset attempts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /hostels:
+    get:
+      tags: [Hostels]
+      summary: List hostels (public: approved only; staff: scoped)
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Hostel" }
+    post:
+      tags: [Hostels]
+      summary: Create a hostel (always unpublished)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/HostelInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      hostel: { $ref: "#/components/schemas/Hostel" }
+        "400": { $ref: "#/components/responses/Forbidden" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: Manager already manages a hostel
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /hostels/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Hostels]
+      summary: Hostel detail with derived room availability
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Hostel" }
+        "404":
+          description: Not found or not visible
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    patch:
+      tags: [Hostels]
+      summary: Edit a hostel (manager: own; admin: any) - partial body; absent fields keep their value
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/HostelInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      hostel: { $ref: "#/components/schemas/Hostel" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      tags: [Hostels]
+      summary: Delete a hostel (admin only; 409 while rooms have bookings)
+      responses:
+        "204": { description: Deleted }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: Hostel has bookings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /hostels/{id}/publish:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [Hostels]
+      summary: Toggle published/unpublished (admin only)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      isApproved: { type: boolean }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /hostels/{id}/image:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [Hostels]
+      summary: Replace the featured photo (manager: own hostel; admin: any)
+      description: >
+        multipart/form-data with one `file` field. JPEG/PNG/WebP only, max
+        5 MB; the server generates the filename and stores it on
+        Hostel.featuredImage. Unsupported type or oversized file -> 400.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      hostel: { $ref: "#/components/schemas/Hostel" }
+        "400":
+          description: Unsupported type, empty file, or over 5 MB
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: Hostel not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      tags: [Hostels]
+      summary: Remove the featured photo (manager: own hostel; admin: any)
+      description: >
+        Idempotent 204. Uploaded files are deleted from disk; seed photos stay
+        on disk and are only unlinked from the record.
+      responses:
+        "204": { description: No content }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: Hostel not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /hostels/{id}/manager:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    put:
+      tags: [Hostels]
+      summary: Set or clear who manages a hostel (admin only)
+      description: >
+        `{ "userId": "<id>" }` promotes a student/manager to run the hostel and
+        demotes the previous manager; `{ "userId": null }` clears the manager.
+        Atomically swapped - one manager per hostel, always.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: { type: [string, "null"] }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      hostel: { $ref: "#/components/schemas/Hostel" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: Hostel or user not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: An administrator cannot be scoped to one hostel
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /hostels/{id}/rooms:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Rooms]
+      summary: Rooms for a hostel with derived availability
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Room" }
+        "404":
+          description: Hostel not found or not visible
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    post:
+      tags: [Rooms]
+      summary: Add a room (manager: own hostel; admin: any)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RoomInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      room: { $ref: "#/components/schemas/Room" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: Duplicate room number
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /rooms/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [Rooms]
+      summary: Edit a room
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RoomInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      room: { $ref: "#/components/schemas/Room" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: Room not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      tags: [Rooms]
+      summary: Delete a room (409 while it has bookings)
+      responses:
+        "204": { description: Deleted }
+        "409":
+          description: Room has bookings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /bookings:
+    get:
+      tags: [Bookings]
+      summary: List bookings (student: own; manager: own hostel; admin: all)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Booking" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Bookings]
+      summary: Request a room (student only; atomic capacity check)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roomId]
+              properties:
+                roomId: { type: string }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      booking: { $ref: "#/components/schemas/Booking" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: Room full / not available
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /bookings/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [Bookings]
+      summary: Approve, reject, or verify a booking's payment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [approve, reject, verify]
+      responses:
+        "200":
+          description: >
+            OK. approve/reject return { data: { booking } }; verify returns
+            { data: { payment } }.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      booking: { $ref: "#/components/schemas/Booking" }
+                      payment: { $ref: "#/components/schemas/Payment" }
+        "400": { $ref: "#/components/responses/Forbidden" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: Business rule violated (already confirmed, capacity reached…)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /payments:
+    get:
+      tags: [Payments]
+      summary: List payments (student: own; manager: own hostel; admin: all)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Payment" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /users:
+    get:
+      tags: [Users]
+      summary: List all accounts (admin only)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      users:
+                        type: array
+                        items: { $ref: "#/components/schemas/User" }
+                      actor:
+                        type: object
+                        properties:
+                          id: { type: string }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Users]
+      summary: Create a student, manager or sub-admin account (admin only)
+      description: >-
+        The role is restricted to STUDENT, MANAGER or ADMIN and is decided by
+        this ADMIN-guarded route - it is never accepted from an anonymous
+        client. Duplicate email or student ID returns 409; an unknown role
+        returns 400. A manager created this way has no hostel until one is
+        assigned.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, phone, role, password]
+              properties:
+                name: { type: string }
+                email: { type: string, format: email }
+                studentIdNumber: { type: [string, "null"] }
+                phone: { type: string }
+                role: { type: string, enum: [STUDENT, MANAGER, ADMIN] }
+                password: { type: string, minLength: 8, maxLength: 72 }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      user: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: Email or student ID already in use
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /users/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [Users]
+      summary: Edit an account - activate/deactivate, update profile, or reset password (admin only, idempotent)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [isActive]
+                  properties:
+                    isActive: { type: boolean }
+                - type: object
+                  required: [name, email, phone]
+                  properties:
+                    name: { type: string }
+                    email: { type: string, format: email }
+                    phone: { type: string }
+                    studentIdNumber: { type: [string, "null"] }
+                    department: { type: [string, "null"] }
+                    password: { type: [string, "null"] }
+      responses:
+        "200":
+          description: OK - deactivation returns {userId, isActive}; profile edit returns the updated user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    oneOf:
+                      - type: object
+                        properties:
+                          userId: { type: string }
+                          isActive: { type: boolean }
+                      - { $ref: "#/components/schemas/User" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: Self-deactivation, or a unique field (email / student ID) already in use
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      tags: [Users]
+      summary: Hard-delete an account with no booking history (admin only)
+      description: >-
+        Completes the user lifecycle (create → edit → activate/deactivate →
+        delete). The booking-history guard returns 409 when the user has
+        bookings - those bookings and their payments reference the account,
+        so deactivate instead. Self-deletion is also 409. Audit-log rows are
+        kept but lose the actor link; a deleted manager's hostel becomes
+        managerless. Audits user.deleted.
+      responses:
+        "204": { description: No content - account deleted }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Booking history on record, or the caller's own account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /users/{id}/hostel:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    put:
+      tags: [Users]
+      summary: Assign or unassign a hostel manager (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hostelId]
+              properties:
+                hostelId: { type: [string, "null"] }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      user: { $ref: "#/components/schemas/User" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: Hostel already has a manager
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /activity:
+    get:
+      tags: [Activity]
+      summary: Paginated activity log (admin only)
+      parameters:
+        - name: action
+          in: query
+          required: false
+          schema: { type: string }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      entries:
+                        type: array
+                        items: { $ref: "#/components/schemas/ActivityEntry" }
+                      page: { type: integer }
+                      pageSize: { type: integer }
+                      total: { type: integer }
+                      totalPages: { type: integer }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /export:
+    get:
+      tags: [Administration]
+      summary: Full database snapshot as JSON (admin only)
+      description: >-
+        hbms-backup format v1 - all six tables plus per-table counts,
+        exportedAt and exporterId. Password hashes are never included.
+        Every export writes a database.exported audit entry.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      format: { type: string, example: hbms-backup }
+                      version: { type: integer, example: 1 }
+                      exportedAt: { type: string, format: date-time }
+                      exporterId: { type: [string, "null"], nullable: true }
+                      counts:
+                        type: object
+                        properties:
+                          users: { type: integer }
+                          hostels: { type: integer }
+                          rooms: { type: integer }
+                          bookings: { type: integer }
+                          payments: { type: integer }
+                          activityLog: { type: integer }
+                      users:
+                        type: array
+                        items:
+                          type: object
+                          description: User without the password hash
+                          additionalProperties: true
+                      hostels: { type: array, items: { type: object, additionalProperties: true } }
+                      rooms: { type: array, items: { type: object, additionalProperties: true } }
+                      bookings: { type: array, items: { type: object, additionalProperties: true } }
+                      payments: { type: array, items: { type: object, additionalProperties: true } }
+                      activityLog: { type: array, items: { type: object, additionalProperties: true } }
+        "403": { $ref: "#/components/responses/Forbidden" }
