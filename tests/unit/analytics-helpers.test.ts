@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { updateProfileSchema } from "@/lib/validation";
+import { bookingRequestSchema, updateProfileSchema } from "@/lib/validation";
 import { parseActivityQuery } from "@/lib/services/activity";
 
 describe("updateProfileSchema (FR-9)", () => {
@@ -19,6 +19,25 @@ describe("updateProfileSchema (FR-9)", () => {
       phone: "0244123456",
     });
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe("bookingRequestSchema", () => {
+  it("requires rules acceptance and a session", () => {
+    const ok = bookingRequestSchema.safeParse({
+      roomId: "room-1",
+      academicSession: "2026/2027",
+      notes: "",
+      acceptRules: "on",
+    });
+    expect(ok.success).toBe(true);
+
+    const denied = bookingRequestSchema.safeParse({
+      roomId: "room-1",
+      academicSession: "2026/2027",
+      acceptRules: false,
+    });
+    expect(denied.success).toBe(false);
   });
 });
 

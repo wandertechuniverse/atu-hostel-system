@@ -88,6 +88,29 @@ export const changePasswordSchema = z
     path: ["confirmPassword"],
   });
 
+/**
+ * Student booking request (FR-6). Amount is never accepted from the client —
+ * it is snapshotted from the room. Rules/disclaimer must be accepted.
+ */
+export const bookingRequestSchema = z.object({
+  roomId: z.string().trim().min(1, "Select a valid room").max(64),
+  academicSession: z
+    .string()
+    .trim()
+    .regex(/^\d{4}\/\d{4}$/, "Use session format YYYY/YYYY, e.g. 2026/2027"),
+  notes: z
+    .string()
+    .trim()
+    .max(500, "Notes must be at most 500 characters")
+    .optional()
+    .or(z.literal("")),
+  acceptRules: z
+    .union([z.literal("on"), z.literal("true"), z.literal("1"), z.boolean()])
+    .refine((v) => v === true || v === "on" || v === "true" || v === "1", {
+      message: "You must accept the booking rules and disclaimer to continue",
+    }),
+});
+
 /** Self-service profile edit (FR-9). Email and role are never accepted here. */
 export const updateProfileSchema = z.object({
   name: z.string().trim().min(3, "Enter your full name").max(100),

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { MapPin } from "lucide-react";
+import { Download, FileText, MapPin } from "lucide-react";
+import Link from "next/link";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
@@ -99,6 +100,30 @@ export default async function HostelDetailPage({ params }: PageProps<"/hostels/[
           <div className="mt-4">
             <FacilityBadges facilities={hostel.facilities} />
           </div>
+          <div className="mt-4 flex flex-wrap gap-3 text-sm">
+            <Link
+              href="/prospectus"
+              className="inline-flex items-center gap-1.5 text-primary underline-offset-4 hover:underline"
+            >
+              <FileText className="size-4" />
+              Sample prospectus
+            </Link>
+            <a
+              href="/docs/sample-hostel-prospectus.pdf"
+              className="inline-flex items-center gap-1.5 text-primary underline-offset-4 hover:underline"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Download className="size-4" />
+              Download PDF
+            </a>
+            <Link
+              href="/disclaimer"
+              className="text-muted-foreground underline-offset-4 hover:underline"
+            >
+              Disclaimer
+            </Link>
+          </div>
         </div>
 
         {hostel.featuredImage && (
@@ -153,6 +178,7 @@ export default async function HostelDetailPage({ params }: PageProps<"/hostels/[
                     <BookingDialog
                       room={room}
                       requiresLogin={!loggedInStudent}
+                      hostelName={hostel.name}
                     />
                   )}
                 </TableCell>

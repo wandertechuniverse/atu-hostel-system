@@ -21,7 +21,12 @@ export async function createBookingAction(
   }
   const session = await requireSession();
   try {
-    await createBooking(session, String(formData.get("roomId") ?? ""));
+    await createBooking(session, {
+      roomId: formData.get("roomId"),
+      academicSession: formData.get("academicSession"),
+      notes: formData.get("notes"),
+      acceptRules: formData.get("acceptRules"),
+    });
   } catch (error) {
     return { error: errorMessage(error) };
   }

@@ -36,6 +36,7 @@ test("student registers, browses hostels, books a room, and sees the request", a
   await row.getByRole("button", { name: "Request booking" }).click();
   const dialog = page.getByRole("dialog", { name: "Request this room" });
   await expect(dialog).toBeVisible();
+  await dialog.getByLabel(/I accept the booking rules/i).check();
   await dialog.getByRole("button", { name: "Submit request" }).click();
 
   // --- My bookings shows the PENDING request (FR-6) ---

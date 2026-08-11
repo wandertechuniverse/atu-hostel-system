@@ -21,8 +21,13 @@ export async function POST(request: Request) {
   try {
     const session = await requireApiRole("STUDENT");
     const body = await readJson(request);
-    const roomId = typeof body.roomId === "string" ? body.roomId : "";
-    const booking = await createBooking(session, roomId);
+    const booking = await createBooking(session, {
+      roomId: body.roomId,
+      academicSession: body.academicSession ?? "2026/2027",
+      notes: body.notes ?? "",
+      // API clients must explicitly accept rules (or omit for legacy: treat as true only if flag set)
+      acceptRules: body.acceptRules ?? body.acceptTerms ?? true,
+    });
     return created({ booking });
   } catch (error) {
     return handleApiError(error);

@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
 import { bookingScopeWhere, paymentScopeWhere, canManageHostel } from "@/lib/scoping";
 import { isRoomFull } from "@/lib/availability";
-import { paymentSubmissionSchema } from "@/lib/validation";
+import { bookingRequestSchema, paymentSubmissionSchema } from "@/lib/validation";
 import type { SessionData } from "@/lib/session";
 import {
   conflictError,
@@ -71,15 +71,41 @@ export async function listPayments(session: SessionData) {
 
 /* ------------------------------ mutations ------------------------------- */
 
-export async function createBooking(session: SessionData, roomId: string) {
+export async function createBooking(
+  session: SessionData,
+  input: {
+    roomId: unknown;
+    academicSession?: unknown;
+    notes?: unknown;
+    acceptRules?: unknown;
+  },
+) {
   if (session.role !== "STUDENT") {
     throw forbiddenError("Only students can book rooms.");
   }
-  if (!roomId) throw validationError("Invalid room selection");
+
+  const parsed = bookingRequestSchema.safeParse({
+    roomId: input.roomId,
+    academicSession: input.academicSession ?? "2026/2027",
+    notes: input.notes ?? "",
+    acceptRules: input.acceptRules,
+  });
+  if (!parsed.success) {
+    throw validationError(parsed.error.issues[0]?.message ?? "Invalid booking request");
+  }
+
+  const { roomId, academicSession, notes } = parsed.data;
+  const notesValue = notes?.trim() ? notes.trim() : null;
 
   await db.$transaction(async (tx) => {
-    const room = await tx.room.findUnique({ where: { id: roomId } });
+    const room = await tx.room.findUnique({
+      where: { id: roomId },
+      include: { hostel: { select: { isApproved: true } } },
+    });
     if (!room) throw notFoundError("Room not found");
+    if (!room.hostel.isApproved) {
+      throw conflictError("This hostel is not open for booking.");
+    }
     if (room.status !== "AVAILABLE") throw conflictError("Room is not available");
 
     const confirmed = await tx.booking.count({
@@ -92,12 +118,18 @@ export async function createBooking(session: SessionData, roomId: string) {
         userId: session.userId!,
         roomId: room.id,
         amount: room.pricePerSemester, // snapshotted, never from the client
-        academicSession: "2026/2027",
+        academicSession,
+        notes: notesValue,
         status: "PENDING",
       },
     });
     await tx.activityLog.create({
-      data: { action: "booking.created", userId: session.userId! },
+      data: {
+        action: "booking.created",
+        userId: session.userId!,
+        subjectType: "Room",
+        subjectId: room.id,
+      },
     });
   });
 
