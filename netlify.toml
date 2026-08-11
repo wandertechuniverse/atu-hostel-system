@@ -1,0 +1,12 @@
+[build]
+  command = "bun run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  BUN_VERSION = "1.3.14"
+  # Placeholder so build can generate the client; runtime uses site env vars.
+  SESSION_SECRET = "build-time-placeholder-replace-in-netlify-ui-32chars"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
