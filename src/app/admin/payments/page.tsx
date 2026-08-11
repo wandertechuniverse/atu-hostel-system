@@ -2,7 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { paymentScopeWhere } from "@/lib/scoping";
-import type { PaymentStatus } from "@/generated/prisma/client";
+import type { PaymentStatus } from "@/generated/prisma/enums";
 import {
   Card,
   CardContent,

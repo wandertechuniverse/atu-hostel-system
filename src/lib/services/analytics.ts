@@ -167,13 +167,17 @@ export async function getAnalytics(
         }),
     isManager
       ? Promise.resolve([] as { action: string; _count: { _all: number } }[])
-      : db.activityLog.groupBy({
-          by: ["action"],
-          where: { createdAt: { gte: since } },
-          _count: { _all: true },
-          orderBy: { _count: { action: "desc" } },
-          take: 8,
-        }),
+      : db.activityLog
+          .groupBy({
+            by: ["action"],
+            where: { createdAt: { gte: since } },
+            _count: { _all: true },
+          })
+          .then((rows) =>
+            rows
+              .sort((a, b) => b._count._all - a._count._all)
+              .slice(0, 8),
+          ),
     db.hostel.findMany({
       where: hostelWhere,
       select: {

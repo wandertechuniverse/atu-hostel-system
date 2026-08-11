@@ -2,7 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { bookingScopeWhere } from "@/lib/scoping";
-import type { BookingStatus } from "@/generated/prisma/client";
+import type { BookingStatus } from "@/generated/prisma/enums";
 import {
   Card,
   CardContent,
