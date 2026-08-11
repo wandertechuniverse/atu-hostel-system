@@ -48,7 +48,11 @@ async function csrfJwtValid(token: string): Promise<boolean> {
 }
 
 function setCsrfCookie(response: NextResponse, token: string) {
-  response.cookies.set(CSRF_COOKIE, token, {
+  // Not httpOnly: client forms must double-submit the same value.
+  // Secure only on HTTPS so local http://localhost still works.
+  response.cookies.set({
+    name: CSRF_COOKIE,
+    value: token,
     httpOnly: false,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
