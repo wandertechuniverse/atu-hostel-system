@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && bun scripts/prepare-demo-db.ts && next build",
+    "build": "prisma generate && bun scripts/prepare-demo-db.ts && next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
