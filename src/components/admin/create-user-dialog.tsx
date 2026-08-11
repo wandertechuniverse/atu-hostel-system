@@ -16,22 +16,18 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
-import { FormSelect } from "@/components/admin/form-select";
 import { createUserAction, type UsersFormState } from "@/lib/actions/users";
 
 const initial: UsersFormState = {};
-
-const ROLE_OPTIONS = [
-  { value: "STUDENT", label: "Student" },
-  { value: "MANAGER", label: "Manager" },
-  { value: "ADMIN", label: "Sub-admin" },
-];
 
 /**
  * Admin-created accounts (PRD story A4). Students self-register; staff
  * accounts - manager and sub-admin - are always created here by an
  * administrator, because the role can never be self-asserted. A manager
  * created this way has no hostel until one is assigned on the Users page.
+ *
+ * Uses a native <select> for role (not Base UI Select) so the dialog never
+ * crashes on open if the headless select portal misbehaves in production.
  */
 export function CreateUserDialog() {
   const [open, setOpen] = useState(false);
@@ -39,7 +35,6 @@ export function CreateUserDialog() {
     createUserAction,
     initial,
   );
-  const [role, setRole] = useState("STUDENT");
 
   // Close after a successful save (the action revalidates the page).
   useEffect(() => {
@@ -56,13 +51,14 @@ export function CreateUserDialog() {
         <DialogHeader>
           <DialogTitle>Add user</DialogTitle>
           <DialogDescription>
-            Create a student, manager, or sub-admin account. The password is
-            set once here - the user can&apos;t change it themselves yet.
+            Create a student, manager, or sub-admin account. Share the password
+            with the user securely — they can change it later under Profile /
+            Change password.
           </DialogDescription>
         </DialogHeader>
 
         <form action={formAction} className="space-y-4">
-      <CsrfInput />
+          <CsrfInput />
           {state.error && (
             <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {state.error}
@@ -88,6 +84,7 @@ export function CreateUserDialog() {
               type="email"
               placeholder="e.g. efua@atu.edu.gh"
               autoComplete="off"
+              autoCapitalize="none"
               required
             />
           </div>
@@ -115,14 +112,20 @@ export function CreateUserDialog() {
             </div>
           </div>
 
-          <FormSelect
-            id="new-role"
-            label="Role"
-            name="role"
-            value={role}
-            onChange={setRole}
-            options={ROLE_OPTIONS}
-          />
+          <div className="space-y-1.5">
+            <Label htmlFor="new-role">Role</Label>
+            <select
+              id="new-role"
+              name="role"
+              defaultValue="STUDENT"
+              required
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs"
+            >
+              <option value="STUDENT">Student</option>
+              <option value="MANAGER">Manager</option>
+              <option value="ADMIN">Sub-admin</option>
+            </select>
+          </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="new-password">Password</Label>

@@ -34,6 +34,7 @@ export async function createUserAction(
 ): Promise<UsersFormState> {
   const csrf = await guardCsrf(formData);
   if (csrf) return csrf;
+  // requireRole may redirect — must not be caught below.
   const session = await requireRole("ADMIN");
   try {
     await createUser(session, {

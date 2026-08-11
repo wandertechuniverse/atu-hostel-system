@@ -159,7 +159,7 @@ export async function exportActivity(
   });
 
   return entries.map((e) => ({
-    Time: e.createdAt.toISOString(),
+    Time: new Date(e.createdAt).toISOString(),
     Event: e.action,
     Actor: e.user?.name ?? "system",
     Email: e.user?.email ?? "",

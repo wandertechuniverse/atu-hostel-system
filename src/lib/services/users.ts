@@ -39,7 +39,11 @@ export async function createUser(
     throw validationError(parsed.error.issues[0]?.message ?? "Invalid input");
   }
 
-  const { name, email, phone, role, password } = parsed.data;
+  const name = parsed.data.name;
+  const email = parsed.data.email.trim().toLowerCase();
+  const phone = parsed.data.phone;
+  const role = parsed.data.role;
+  const password = parsed.data.password;
   const studentIdNumber = parsed.data.studentIdNumber?.trim() || null;
 
   const emailTaken = await db.user.findUnique({ where: { email } });
