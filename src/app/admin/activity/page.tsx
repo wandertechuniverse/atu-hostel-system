@@ -1,7 +1,23 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, ScrollText } from "lucide-react";
-import { db } from "@/lib/db";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ScrollText,
+  ShieldAlert,
+  Activity,
+  LogIn,
+  Database,
+} from "lucide-react";
 import { requireRole } from "@/lib/auth";
+import { db } from "@/lib/db";
+import {
+  activityFilterOptions,
+  activityStats,
+  exportActivity,
+  listActivity,
+  PAGE_SIZES,
+  DEFAULT_PAGE_SIZE,
+} from "@/lib/services/activity";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -18,15 +34,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ExportCsvButton } from "@/components/admin/export-csv-button";
 
 export const dynamic = "force-dynamic";
 
-const PAGE_SIZES = [10, 25, 50, 100] as const;
-const DEFAULT_PAGE_SIZE = 25;
-
 type ActionTone = "default" | "secondary" | "destructive" | "outline";
 
-/** Colour-code the event family so security events stand out (SECURITY.md §6). */
 function actionTone(action: string): ActionTone {
   if (action.includes("failed") || action.includes("rate_limited")) {
     return "destructive";
@@ -49,37 +62,49 @@ function formatTime(iso: Date) {
 export default async function AdminActivityPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; action?: string; pageSize?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    action?: string;
+    pageSize?: string;
+    subjectType?: string;
+    q?: string;
+    from?: string;
+    to?: string;
+  }>;
 }) {
-  await requireRole("ADMIN");
-
+  const session = await requireRole("ADMIN");
   const sp = await searchParams;
+
   const page = Math.max(1, Number(sp.page) || 1);
   const actionFilter = sp.action?.trim() || "";
+  const subjectType = sp.subjectType?.trim() || "";
+  const q = sp.q?.trim() || "";
+  const from = sp.from?.trim() || "";
+  const to = sp.to?.trim() || "";
   const rawSize = Number(sp.pageSize) || DEFAULT_PAGE_SIZE;
   const pageSize = (PAGE_SIZES as readonly number[]).includes(rawSize)
     ? rawSize
     : DEFAULT_PAGE_SIZE;
 
-  const where = actionFilter ? { action: actionFilter } : {};
+  const filters = {
+    action: actionFilter,
+    subjectType,
+    q,
+    from,
+    to,
+    page,
+    pageSize,
+  };
 
-  const [rows, total, actionOptions] = await Promise.all([
-    db.activityLog.findMany({
-      where,
-      include: { user: { select: { id: true, name: true, email: true } } },
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    }),
-    db.activityLog.count({ where }),
-    db.activityLog.findMany({
-      select: { action: true },
-      distinct: ["action"],
-      orderBy: { action: "asc" },
-    }),
+  const [list, stats, options, exportRows] = await Promise.all([
+    listActivity(session, filters),
+    activityStats(),
+    activityFilterOptions(),
+    exportActivity(session, { ...filters, page: 1, pageSize: 25 }, 2_000),
   ]);
 
-  // Resolve opaque subject ids to human labels in a few batched queries.
+  const { entries: rows, total, totalPages } = list;
+
   const subjectIds = (type: string) =>
     rows
       .filter((r) => r.subjectType === type && r.subjectId)
@@ -121,9 +146,7 @@ export default async function AdminActivityPage({
       `${b.user.name} · ${b.room.hostel.name} ${b.room.roomNumber}`,
     ]),
   );
-  const paymentLabel = new Map(
-    payments.map((p) => [p.id, p.reference]),
-  );
+  const paymentLabel = new Map(payments.map((p) => [p.id, p.reference]));
 
   function subjectLabel(type: string | null, id: string | null): string {
     if (!type || !id) return "-";
@@ -134,82 +157,191 @@ export default async function AdminActivityPage({
     return id.slice(0, 8);
   }
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const qs = (p: number, size = pageSize) => {
-    const params = new URLSearchParams({ page: String(p), pageSize: String(size) });
+    const params = new URLSearchParams({
+      page: String(p),
+      pageSize: String(size),
+    });
     if (actionFilter) params.set("action", actionFilter);
+    if (subjectType) params.set("subjectType", subjectType);
+    if (q) params.set("q", q);
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
     return `?${params}`;
   };
 
+  const selectClass =
+    "h-9 rounded-md border border-input bg-background px-3 text-sm shadow-xs focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none";
+
+  const summary = [
+    {
+      label: "Total events",
+      value: stats.total.toLocaleString(),
+      icon: Database,
+      chip: "bg-slate-500/10 text-slate-600 dark:text-slate-300",
+    },
+    {
+      label: "Today",
+      value: stats.today.toLocaleString(),
+      icon: Activity,
+      chip: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+    },
+    {
+      label: "Logins (7d)",
+      value: stats.loginsWeek.toLocaleString(),
+      icon: LogIn,
+      chip: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    },
+    {
+      label: "Security events (7d)",
+      value: stats.securityWeek.toLocaleString(),
+      icon: ShieldAlert,
+      chip: "bg-destructive/10 text-destructive",
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Activity</h1>
-        <p className="text-sm text-muted-foreground">
-          Read-only audit trail of significant actions (FR-10). Append-only -
-          entries cannot be edited or deleted. Administrator only.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Audit log</h1>
+          <p className="text-sm text-muted-foreground">
+            Append-only trail of significant actions (FR-10). Entries cannot be
+            edited or deleted. Administrator only.
+          </p>
+        </div>
+        <ExportCsvButton
+          rows={exportRows}
+          filename={`hbms-audit-${new Date().toISOString().slice(0, 10)}.csv`}
+          label="Export CSV"
+          className="self-start"
+        />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {summary.map((card) => (
+          <Card key={card.label}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {card.label}
+              </CardTitle>
+              <span className={`rounded-lg p-2 ${card.chip}`} aria-hidden>
+                <card.icon className="size-4" />
+              </span>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold tracking-tight">{card.value}</div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       <Card>
-        <CardHeader className="flex-row items-center justify-between gap-4 space-y-0">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <ScrollText className="size-4 text-muted-foreground" />
-              System activity log
-            </CardTitle>
-            <CardDescription>
-              {total.toLocaleString()} entr{total === 1 ? "y" : "ies"} · page{" "}
-              {page} of {totalPages}
-            </CardDescription>
+        <CardHeader className="space-y-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <ScrollText className="size-4 text-muted-foreground" />
+                System activity
+              </CardTitle>
+              <CardDescription>
+                {total.toLocaleString()} matching entr
+                {total === 1 ? "y" : "ies"} · page {page} of {totalPages}
+              </CardDescription>
+            </div>
           </div>
-          {/* Plain GET form - filters via URL search params, no client JS. */}
-          <form method="get" className="flex flex-wrap items-center gap-2">
-            <label htmlFor="action" className="text-xs text-muted-foreground">
-              Event
+
+          <form
+            method="get"
+            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+          >
+            <label className="space-y-1 text-xs text-muted-foreground">
+              <span className="block">Search</span>
+              <input
+                name="q"
+                defaultValue={q}
+                placeholder="Actor, event, IP…"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs"
+              />
             </label>
-            <select
-              id="action"
-              name="action"
-              defaultValue={actionFilter}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-xs focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-            >
-              <option value="">All events</option>
-              {actionOptions.map((a) => (
-                <option key={a.action} value={a.action}>
-                  {a.action}
-                </option>
-              ))}
-            </select>
-            <label htmlFor="pageSize" className="text-xs text-muted-foreground">
-              Rows
-            </label>
-            <select
-              id="pageSize"
-              name="pageSize"
-              defaultValue={String(pageSize)}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-xs focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-            >
-              {PAGE_SIZES.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-            <button
-              type="submit"
-              className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-            >
-              Apply
-            </button>
-            {(actionFilter || pageSize !== DEFAULT_PAGE_SIZE) && (
-              <Link
-                href="/admin/activity"
-                className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+            <label className="space-y-1 text-xs text-muted-foreground">
+              <span className="block">Event</span>
+              <select
+                name="action"
+                defaultValue={actionFilter}
+                className={`${selectClass} w-full`}
               >
-                Clear
-              </Link>
-            )}
+                <option value="">All events</option>
+                {options.actions.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-1 text-xs text-muted-foreground">
+              <span className="block">Subject</span>
+              <select
+                name="subjectType"
+                defaultValue={subjectType}
+                className={`${selectClass} w-full`}
+              >
+                <option value="">All types</option>
+                {options.subjectTypes.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-1 text-xs text-muted-foreground">
+              <span className="block">From</span>
+              <input
+                type="date"
+                name="from"
+                defaultValue={from}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs"
+              />
+            </label>
+            <label className="space-y-1 text-xs text-muted-foreground">
+              <span className="block">To</span>
+              <input
+                type="date"
+                name="to"
+                defaultValue={to}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs"
+              />
+            </label>
+            <label className="space-y-1 text-xs text-muted-foreground">
+              <span className="block">Rows</span>
+              <select
+                name="pageSize"
+                defaultValue={String(pageSize)}
+                className={`${selectClass} w-full`}
+              >
+                {PAGE_SIZES.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex items-end gap-2 sm:col-span-2 xl:col-span-6">
+              <button
+                type="submit"
+                className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
+              >
+                Apply filters
+              </button>
+              {(actionFilter || subjectType || q || from || to || pageSize !== DEFAULT_PAGE_SIZE) && (
+                <Link
+                  href="/admin/activity"
+                  className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+                >
+                  Clear
+                </Link>
+              )}
+            </div>
           </form>
         </CardHeader>
         <CardContent>
@@ -240,9 +372,7 @@ export default async function AdminActivityPage({
                     {formatTime(log.createdAt)}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={actionTone(log.action)}>
-                      {log.action}
-                    </Badge>
+                    <Badge variant={actionTone(log.action)}>{log.action}</Badge>
                   </TableCell>
                   <TableCell>
                     {log.user ? (

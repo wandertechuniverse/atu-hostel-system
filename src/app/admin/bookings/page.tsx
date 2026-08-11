@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { bookingScopeWhere } from "@/lib/scoping";
+import type { BookingStatus } from "@/generated/prisma/client";
 import {
   Card,
   CardContent,
@@ -21,13 +23,39 @@ import { BookingRowActions } from "@/components/admin/booking-row-actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminBookingsPage() {
+const STATUSES = ["PENDING", "CONFIRMED", "CANCELLED", "COMPLETED"] as const;
+
+export default async function AdminBookingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string; q?: string }>;
+}) {
   const session = await requireRole("MANAGER", "ADMIN");
   const isManager = session.role === "MANAGER";
+  const sp = await searchParams;
+  const statusFilter = (sp.status?.trim().toUpperCase() ?? "") as string;
+  const q = sp.q?.trim() ?? "";
 
-  // Row-level security: managers only ever load their own hostel's bookings.
+  const status =
+    STATUSES.includes(statusFilter as (typeof STATUSES)[number])
+      ? (statusFilter as BookingStatus)
+      : undefined;
+
   const bookings = await db.booking.findMany({
-    where: bookingScopeWhere(session),
+    where: {
+      ...bookingScopeWhere(session),
+      ...(status ? { status } : {}),
+      ...(q
+        ? {
+            OR: [
+              { user: { name: { contains: q } } },
+              { user: { studentIdNumber: { contains: q } } },
+              { room: { roomNumber: { contains: q } } },
+              { room: { hostel: { name: { contains: q } } } },
+            ],
+          }
+        : {}),
+    },
     include: {
       user: { select: { name: true, studentIdNumber: true } },
       room: {
@@ -42,6 +70,15 @@ export default async function AdminBookingsPage() {
     orderBy: { createdAt: "desc" },
   });
 
+  const counts = await db.booking.groupBy({
+    by: ["status"],
+    where: bookingScopeWhere(session),
+    _count: { _all: true },
+  });
+  const countMap = Object.fromEntries(
+    counts.map((c) => [c.status, c._count._all]),
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -53,13 +90,65 @@ export default async function AdminBookingsPage() {
         </p>
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href="/admin/bookings"
+          className={`rounded-full border px-3 py-1 text-xs ${
+            !status ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+          }`}
+        >
+          All ({Object.values(countMap).reduce((a, b) => a + b, 0)})
+        </Link>
+        {STATUSES.map((s) => (
+          <Link
+            key={s}
+            href={`/admin/bookings?status=${s}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+            className={`rounded-full border px-3 py-1 text-xs ${
+              status === s
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted"
+            }`}
+          >
+            {s} ({countMap[s] ?? 0})
+          </Link>
+        ))}
+      </div>
+
       <Card>
-        <CardHeader>
-          <CardTitle>Booking requests</CardTitle>
-          <CardDescription>
-            {bookings.length} request{bookings.length === 1 ? "" : "s"} · newest
-            first
-          </CardDescription>
+        <CardHeader className="space-y-3">
+          <div>
+            <CardTitle>Booking requests</CardTitle>
+            <CardDescription>
+              {bookings.length} request{bookings.length === 1 ? "" : "s"}
+              {status ? ` · ${status}` : ""} · newest first
+            </CardDescription>
+          </div>
+          <form method="get" className="flex flex-wrap items-end gap-2">
+            {status && <input type="hidden" name="status" value={status} />}
+            <label className="space-y-1 text-xs text-muted-foreground">
+              <span className="block">Search</span>
+              <input
+                name="q"
+                defaultValue={q}
+                placeholder="Student, hostel, room…"
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-xs"
+              />
+            </label>
+            <button
+              type="submit"
+              className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
+            >
+              Search
+            </button>
+            {q && (
+              <Link
+                href={status ? `/admin/bookings?status=${status}` : "/admin/bookings"}
+                className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+              >
+                Clear
+              </Link>
+            )}
+          </form>
         </CardHeader>
         <CardContent>
           <Table>
@@ -79,7 +168,7 @@ export default async function AdminBookingsPage() {
               {bookings.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center text-muted-foreground">
-                    No booking requests yet.
+                    No booking requests match.
                   </TableCell>
                 </TableRow>
               )}
@@ -112,12 +201,7 @@ export default async function AdminBookingsPage() {
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    {/* Keyed on status so the Approve/Reject/Verify buttons
-                        reflect the saved state after revalidation. */}
-                    <BookingRowActions
-                      key={`${booking.id}:${booking.status}:${booking.payment?.status ?? "none"}`}
-                      booking={booking}
-                    />
+                    <BookingRowActions booking={booking} />
                   </TableCell>
                 </TableRow>
               ))}

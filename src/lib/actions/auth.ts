@@ -13,6 +13,7 @@ import {
   registerUser,
   requestPasswordReset,
   resetPassword,
+  updateOwnProfile,
 } from "@/lib/services/auth";
 
 export type AuthFormState = { error?: string };
@@ -144,6 +145,32 @@ export async function changePasswordAction(
       currentPassword: formData.get("currentPassword"),
       newPassword: formData.get("newPassword"),
       confirmPassword: formData.get("confirmPassword"),
+    });
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
+  return { ok: true };
+}
+
+export type ProfileFormState = { ok?: boolean; error?: string };
+
+/** Self-service profile update (FR-9) — name, phone, department, student ID. */
+export async function updateProfileAction(
+  _prev: ProfileFormState,
+  formData: FormData,
+): Promise<ProfileFormState> {
+  try {
+    await requireCsrf(formData);
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
+  const session = await requireRole("STUDENT", "MANAGER", "ADMIN");
+  try {
+    await updateOwnProfile(session, {
+      name: formData.get("name"),
+      phone: formData.get("phone"),
+      department: formData.get("department"),
+      studentIdNumber: formData.get("studentIdNumber"),
     });
   } catch (error) {
     return { error: errorMessage(error) };

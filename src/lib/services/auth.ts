@@ -23,7 +23,9 @@ import {
   loginSchema,
   registerSchema,
   resetPasswordSchema,
+  updateProfileSchema,
 } from "@/lib/validation";
+import type { SessionData } from "@/lib/session";
 import {
   AppError,
   conflictError,
@@ -185,6 +187,79 @@ export async function changeOwnPassword(
         userId: user.id,
         subjectType: "User",
         subjectId: user.id,
+      },
+    });
+  });
+
+  return { ok: true };
+}
+
+/**
+ * Self-service profile update (FR-9). Role, email and isActive are never
+ * taken from the client — only name, phone, department and student ID.
+ */
+export async function updateOwnProfile(
+  session: SessionData,
+  input: {
+    name: unknown;
+    phone: unknown;
+    department: unknown;
+    studentIdNumber: unknown;
+  },
+) {
+  if (!session.userId) throw unauthenticatedError();
+
+  const parsed = updateProfileSchema.safeParse(input);
+  if (!parsed.success) {
+    throw validationError(parsed.error.issues[0]?.message ?? "Invalid input");
+  }
+
+  const data = {
+    name: parsed.data.name,
+    phone: parsed.data.phone,
+    department: parsed.data.department?.trim()
+      ? parsed.data.department.trim()
+      : null,
+    studentIdNumber:
+      session.role === "STUDENT"
+        ? parsed.data.studentIdNumber?.trim()
+          ? parsed.data.studentIdNumber.trim()
+          : null
+        : undefined,
+  };
+
+  // Unique student ID collision
+  if (data.studentIdNumber) {
+    const clash = await db.user.findFirst({
+      where: {
+        studentIdNumber: data.studentIdNumber,
+        NOT: { id: session.userId },
+      },
+      select: { id: true },
+    });
+    if (clash) {
+      throw validationError("That student ID is already registered.");
+    }
+  }
+
+  await db.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: session.userId! },
+      data: {
+        name: data.name,
+        phone: data.phone,
+        department: data.department,
+        ...(data.studentIdNumber !== undefined
+          ? { studentIdNumber: data.studentIdNumber }
+          : {}),
+      },
+    });
+    await tx.activityLog.create({
+      data: {
+        action: "user.profile_updated",
+        userId: session.userId!,
+        subjectType: "User",
+        subjectId: session.userId!,
       },
     });
   });

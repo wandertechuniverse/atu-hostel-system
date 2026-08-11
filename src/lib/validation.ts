@@ -88,6 +88,20 @@ export const changePasswordSchema = z
     path: ["confirmPassword"],
   });
 
+/** Self-service profile edit (FR-9). Email and role are never accepted here. */
+export const updateProfileSchema = z.object({
+  name: z.string().trim().min(3, "Enter your full name").max(100),
+  phone: z.string().trim().min(8, "Enter a valid phone number").max(20),
+  department: z.string().trim().max(100).nullish().or(z.literal("")),
+  studentIdNumber: z
+    .string()
+    .trim()
+    .min(4, "Enter your ATU student ID, e.g. 01240233C")
+    .max(20)
+    .nullish()
+    .or(z.literal("")),
+});
+
 /**
  * Hostel form (docs/09-build-prompts.md Prompt 3). Mass-assignment safe:
  * `isApproved` and the manager link are never accepted from the client.

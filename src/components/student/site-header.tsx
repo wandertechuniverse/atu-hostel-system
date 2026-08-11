@@ -1,5 +1,12 @@
 import Link from "next/link";
-import { Building2, KeyRound, LayoutDashboard, LogOut, User } from "lucide-react";
+import {
+  Building2,
+  KeyRound,
+  LayoutDashboard,
+  LogOut,
+  User,
+  UserCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { getSession } from "@/lib/auth";
@@ -40,9 +47,15 @@ export async function SiteHeader() {
             </Button>
           )}
           {loggedIn && (
+            <Button render={<Link href="/profile" />} nativeButton={false} variant="ghost" size="sm">
+              <UserCircle className="size-4" />
+              <span className="sr-only sm:not-sr-only">Profile</span>
+            </Button>
+          )}
+          {loggedIn && (
             <Button render={<Link href="/change-password" />} nativeButton={false} variant="ghost" size="sm">
               <KeyRound className="size-4" />
-              <span className="sr-only sm:not-sr-only">Change password</span>
+              <span className="sr-only sm:not-sr-only">Password</span>
             </Button>
           )}
           {loggedIn ? (

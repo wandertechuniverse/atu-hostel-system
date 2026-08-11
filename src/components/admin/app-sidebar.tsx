@@ -5,6 +5,7 @@ import {
   CalendarCheck2,
   KeyRound,
   LayoutDashboard,
+  LineChart,
   LogOut,
   ScrollText,
   Users,
@@ -28,12 +29,13 @@ import { CsrfInput } from "@/components/csrf-input";
 
 const nav = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, adminOnly: false },
+  { href: "/admin/analytics", label: "Analytics", icon: LineChart, adminOnly: false },
   { href: "/admin/hostels", label: "Hostels", icon: Building2, adminOnly: false },
   { href: "/admin/bookings", label: "Bookings", icon: CalendarCheck2, adminOnly: false },
   { href: "/admin/payments", label: "Payments", icon: Wallet, adminOnly: false },
   { href: "/admin/reports", label: "Reports", icon: BarChart3, adminOnly: false },
   { href: "/admin/users", label: "Users", icon: Users, adminOnly: true },
-  { href: "/admin/activity", label: "Activity", icon: ScrollText, adminOnly: true },
+  { href: "/admin/activity", label: "Audit log", icon: ScrollText, adminOnly: true },
 ];
 
 export async function AppSidebar() {

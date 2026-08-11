@@ -1,8 +1,18 @@
-import { Users, Building2, BedDouble, Wallet, DatabaseBackup } from "lucide-react";
+import Link from "next/link";
+import {
+  Users,
+  Building2,
+  BedDouble,
+  Wallet,
+  DatabaseBackup,
+  LineChart,
+  ScrollText,
+} from "lucide-react";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { bookingScopeWhere, hostelScopeWhere } from "@/lib/scoping";
 import { ExportDatabaseButton } from "@/components/admin/export-database-button";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -32,51 +42,65 @@ export default async function AdminOverviewPage() {
     ? { booking: { room: { hostelId: session.hostelId ?? "__none__" } } }
     : {};
 
-  const [students, hostelsByType, activeBookings, pendingPayments, recentBookings, exportCounts] =
-    await Promise.all([
-      isManager
-        ? db.booking
-            .findMany({
-              where: bookingWhere,
-              distinct: ["userId"],
-              select: { userId: true },
-            })
-            .then((rows) => rows.length)
-        : db.user.count({ where: { role: "STUDENT" } }),
-      db.hostel.groupBy({
-        by: ["type"],
-        where: hostelScopeWhere(session),
-        _count: { _all: true },
-      }),
-      db.booking.count({ where: { ...bookingWhere, status: "CONFIRMED" } }),
-      db.payment.count({ where: { ...paymentWhere, status: "PENDING" } }),
-      db.booking.findMany({
-        where: bookingWhere,
-        include: {
-          user: { select: { name: true } },
-          room: { include: { hostel: { select: { name: true } } } },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 8,
-      }),
-      isManager
-        ? null
-        : Promise.all([
-            db.user.count(),
-            db.hostel.count(),
-            db.room.count(),
-            db.booking.count(),
-            db.payment.count(),
-            db.activityLog.count(),
-          ]).then(([users, hostels, rooms, bookings, payments, activityLog]) => ({
-            users,
-            hostels,
-            rooms,
-            bookings,
-            payments,
-            activityLog,
-          })),
-    ]);
+  const [
+    students,
+    hostelsByType,
+    activeBookings,
+    pendingPayments,
+    recentBookings,
+    exportCounts,
+    recentAudit,
+  ] = await Promise.all([
+    isManager
+      ? db.booking
+          .findMany({
+            where: bookingWhere,
+            distinct: ["userId"],
+            select: { userId: true },
+          })
+          .then((rows) => rows.length)
+      : db.user.count({ where: { role: "STUDENT" } }),
+    db.hostel.groupBy({
+      by: ["type"],
+      where: hostelScopeWhere(session),
+      _count: { _all: true },
+    }),
+    db.booking.count({ where: { ...bookingWhere, status: "CONFIRMED" } }),
+    db.payment.count({ where: { ...paymentWhere, status: "PENDING" } }),
+    db.booking.findMany({
+      where: bookingWhere,
+      include: {
+        user: { select: { name: true } },
+        room: { include: { hostel: { select: { name: true } } } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+    }),
+    isManager
+      ? null
+      : Promise.all([
+          db.user.count(),
+          db.hostel.count(),
+          db.room.count(),
+          db.booking.count(),
+          db.payment.count(),
+          db.activityLog.count(),
+        ]).then(([users, hostels, rooms, bookings, payments, activityLog]) => ({
+          users,
+          hostels,
+          rooms,
+          bookings,
+          payments,
+          activityLog,
+        })),
+    isManager
+      ? null
+      : db.activityLog.findMany({
+          include: { user: { select: { name: true } } },
+          orderBy: { createdAt: "desc" },
+          take: 6,
+        }),
+  ]);
 
   const countOf = (h: (typeof hostelsByType)[number] | undefined) =>
     (h?._count as { _all: number } | undefined)?. _all ?? 0;
@@ -112,15 +136,35 @@ export default async function AdminOverviewPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {isManager ? "Hostel overview" : "Overview"}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {isManager
-            ? "Scoped to your hostel only."
-            : "Institution-wide occupancy, bookings and payments."}
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {isManager ? "Hostel overview" : "Overview"}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {isManager
+              ? "Scoped to your hostel only."
+              : "Institution-wide occupancy, bookings and payments."}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/admin/analytics"
+            className="inline-flex h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm hover:bg-muted"
+          >
+            <LineChart className="size-4" />
+            Analytics
+          </Link>
+          {!isManager && (
+            <Link
+              href="/admin/activity"
+              className="inline-flex h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm hover:bg-muted"
+            >
+              <ScrollText className="size-4" />
+              Audit log
+            </Link>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -168,12 +212,64 @@ export default async function AdminOverviewPage() {
         </Card>
       )}
 
+      {!isManager && recentAudit && recentAudit.length > 0 && (
+        <Card>
+          <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
+            <div>
+              <CardTitle>Recent audit events</CardTitle>
+              <CardDescription>Latest entries from the append-only activity log</CardDescription>
+            </div>
+            <Link
+              href="/admin/activity"
+              className="text-xs text-primary underline-offset-4 hover:underline"
+            >
+              View all →
+            </Link>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {recentAudit.map((log) => (
+                <li
+                  key={log.id}
+                  className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 py-2 text-sm last:border-0"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className="font-mono text-[10px]">
+                      {log.action}
+                    </Badge>
+                    <span className="text-muted-foreground">
+                      {log.user?.name ?? "system"}
+                    </span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(log.createdAt).toLocaleString("en-GB", {
+                      day: "2-digit",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
-        <CardHeader>
-          <CardTitle>Recent booking requests</CardTitle>
-          <CardDescription>
-            Latest submissions across {isManager ? "your hostel" : "all hostels"}.
-          </CardDescription>
+        <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
+          <div>
+            <CardTitle>Recent booking requests</CardTitle>
+            <CardDescription>
+              Latest submissions across {isManager ? "your hostel" : "all hostels"}.
+            </CardDescription>
+          </div>
+          <Link
+            href="/admin/bookings"
+            className="text-xs text-primary underline-offset-4 hover:underline"
+          >
+            Manage bookings →
+          </Link>
         </CardHeader>
         <CardContent>
           <Table>
