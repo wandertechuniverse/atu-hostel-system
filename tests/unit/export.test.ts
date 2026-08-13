@@ -36,6 +36,6 @@ describe("redactUser", () => {
 describe("export metadata", () => {
   it("is a versioned, identifiable snapshot format", () => {
     expect(EXPORT_FORMAT).toBe("hbms-backup");
-    expect(EXPORT_VERSION).toBe(1);
+    expect(EXPORT_VERSION).toBe(2);
   });
 });

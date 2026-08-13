@@ -57,7 +57,7 @@ export function BookingDialog({
             {hostelName ? `${hostelName} · ` : ""}
             Room {room.roomNumber} ({room.roomType}) · GH₵{" "}
             {room.pricePerSemester.toLocaleString()} per academic year. Your request
-            goes to the hostel manager for approval — you only pay after it is approved.
+            goes to the hostel manager for approval - you only pay after it is approved.
           </DialogDescription>
         </DialogHeader>
         <form action={formAction} className="space-y-4">

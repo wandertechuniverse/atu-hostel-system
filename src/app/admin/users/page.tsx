@@ -30,7 +30,7 @@ const roleVariant: Record<string, "default" | "secondary" | "outline"> = {
   ADMIN: "outline",
 };
 
-/** Prisma/libsql may surface DateTime as Date or ISO string — never assume .getTime(). */
+/** Prisma/libsql may surface DateTime as Date or ISO string - never assume .getTime(). */
 function safeDateKey(value: Date | string | null | undefined) {
   if (!value) return "0";
   if (value instanceof Date) return String(value.getTime());

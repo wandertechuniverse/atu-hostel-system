@@ -52,7 +52,7 @@ export function CreateUserDialog() {
           <DialogTitle>Add user</DialogTitle>
           <DialogDescription>
             Create a student, manager, or sub-admin account. Share the password
-            with the user securely — they can change it later under Profile /
+            with the user securely - they can change it later under Profile /
             Change password.
           </DialogDescription>
         </DialogHeader>

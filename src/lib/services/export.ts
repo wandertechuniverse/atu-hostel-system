@@ -24,13 +24,13 @@ export type { DatabaseExport };
 
 /**
  * Admin-only (callers must have run requireRole/requireApiRole("ADMIN")).
- * Reads all six tables in parallel and returns a JSON-safe snapshot.
+ * Reads every table in parallel and returns a JSON-safe snapshot.
  * Dates serialize via JSON.stringify into ISO strings.
  */
 export async function exportDatabase(
   exporterId: string | null,
 ): Promise<DatabaseExport> {
-  const [users, hostels, rooms, bookings, payments, activityLog] =
+  const [users, hostels, rooms, bookings, payments, activityLog, notifications] =
     await Promise.all([
       db.user.findMany({ orderBy: { createdAt: "asc" } }),
       db.hostel.findMany({ orderBy: { createdAt: "asc" } }),
@@ -38,6 +38,7 @@ export async function exportDatabase(
       db.booking.findMany({ orderBy: { createdAt: "asc" } }),
       db.payment.findMany({ orderBy: { createdAt: "asc" } }),
       db.activityLog.findMany({ orderBy: { createdAt: "asc" } }),
+      db.notification.findMany({ orderBy: { createdAt: "asc" } }),
     ]);
 
   const sanitizedUsers = users.map((u) => redactUser({ ...u }));
@@ -54,6 +55,7 @@ export async function exportDatabase(
       bookings: bookings.length,
       payments: payments.length,
       activityLog: activityLog.length,
+      notifications: notifications.length,
     },
     users: sanitizedUsers,
     hostels: hostels.map((h) => ({ ...h })),
@@ -61,6 +63,7 @@ export async function exportDatabase(
     bookings: bookings.map((b) => ({ ...b })),
     payments: payments.map((p) => ({ ...p })),
     activityLog: activityLog.map((l) => ({ ...l })),
+    notifications: notifications.map((n) => ({ ...n })),
   };
 
   // The export itself is a security-relevant event (SECURITY.md §6).

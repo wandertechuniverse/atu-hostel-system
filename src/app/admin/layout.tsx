@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { AppSidebar } from "@/components/admin/app-sidebar";
+import { NotificationMenu } from "@/components/notifications/notification-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +24,8 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <span className="text-sm font-medium">HBMS Admin</span>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-1">
+            <NotificationMenu />
             <ThemeToggle />
           </div>
         </header>

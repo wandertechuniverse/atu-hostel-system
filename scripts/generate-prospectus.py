@@ -41,7 +41,7 @@ story = []
 story.append(Paragraph("Accra Technical University", styles["Title"]))
 story.append(
     Paragraph(
-        "Hostel Booking Management System — Sample Prospectus",
+        "Hostel Booking Management System - Sample Prospectus",
         styles["Heading2"],
     )
 )
@@ -111,7 +111,7 @@ items = [
     "A booking is a <b>request</b> until a manager approves it.",
     "Capacity is enforced: beds = room capacity − confirmed bookings (no double allocation).",
     "Payment amount is taken from the booking record, never from the browser.",
-    "Mock gateway — no real money moves in this academic demo.",
+    "Mock gateway - no real money moves in this academic demo.",
     "Students should read the disclaimer and privacy notice before requesting a room.",
 ]
 story.append(

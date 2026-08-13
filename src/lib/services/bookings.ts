@@ -1,7 +1,13 @@
 import { db } from "@/lib/db";
-import { audit } from "@/lib/audit";
 import { bookingScopeWhere, paymentScopeWhere, canManageHostel } from "@/lib/scoping";
 import { isRoomFull } from "@/lib/availability";
+import {
+  notifyBookingApproved,
+  notifyBookingCreated,
+  notifyBookingRejected,
+  notifyPaymentSubmitted,
+  notifyPaymentVerified,
+} from "@/lib/notifications";
 import { bookingRequestSchema, paymentSubmissionSchema } from "@/lib/validation";
 import type { SessionData } from "@/lib/session";
 import {
@@ -97,7 +103,7 @@ export async function createBooking(
   const { roomId, academicSession, notes } = parsed.data;
   const notesValue = notes?.trim() ? notes.trim() : null;
 
-  await db.$transaction(async (tx) => {
+  const created = await db.$transaction(async (tx) => {
     const room = await tx.room.findUnique({
       where: { id: roomId },
       include: { hostel: { select: { isApproved: true } } },
@@ -113,7 +119,7 @@ export async function createBooking(
     });
     if (isRoomFull(room.capacity, confirmed)) throw conflictError("This room is full");
 
-    await tx.booking.create({
+    const booking = await tx.booking.create({
       data: {
         userId: session.userId!,
         roomId: room.id,
@@ -121,6 +127,16 @@ export async function createBooking(
         academicSession,
         notes: notesValue,
         status: "PENDING",
+      },
+      include: {
+        room: {
+          select: {
+            id: true,
+            roomNumber: true,
+            roomType: true,
+            hostel: { select: { id: true, name: true } },
+          },
+        },
       },
     });
     await tx.activityLog.create({
@@ -131,22 +147,13 @@ export async function createBooking(
         subjectId: room.id,
       },
     });
+    return booking;
   });
 
-  return db.booking.findFirst({
-    where: { userId: session.userId! },
-    orderBy: { createdAt: "desc" },
-    include: {
-      room: {
-        select: {
-          id: true,
-          roomNumber: true,
-          roomType: true,
-          hostel: { select: { id: true, name: true } },
-        },
-      },
-    },
-  });
+  // After commit - student confirmation + manager/admin alert.
+  await notifyBookingCreated(created.id);
+
+  return created;
 }
 
 /** Approve a booking request; capacity is re-checked atomically. */
@@ -182,6 +189,7 @@ export async function approveBooking(session: SessionData, bookingId: string) {
       },
     });
   });
+  await notifyBookingApproved(bookingId);
   return db.booking.findUnique({ where: { id: bookingId } });
 }
 
@@ -213,6 +221,7 @@ export async function rejectBooking(session: SessionData, bookingId: string) {
       },
     });
   });
+  await notifyBookingRejected(bookingId);
   return db.booking.findUnique({ where: { id: bookingId } });
 }
 
@@ -260,6 +269,7 @@ export async function verifyPayment(session: SessionData, bookingId: string) {
       },
     });
   });
+  await notifyPaymentVerified(bookingId);
   return db.payment.findUnique({ where: { bookingId } });
 }
 
@@ -330,5 +340,6 @@ export async function submitPayment(
     });
   });
 
+  await notifyPaymentSubmitted(bookingId);
   return db.payment.findUnique({ where: { bookingId } });
 }

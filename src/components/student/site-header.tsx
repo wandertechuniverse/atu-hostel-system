@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { NotificationMenu } from "@/components/notifications/notification-menu";
 import { getSession } from "@/lib/auth";
 import { logoutAction } from "@/lib/actions/auth";
 import { CsrfInput } from "@/components/csrf-input";
@@ -58,6 +59,7 @@ export async function SiteHeader() {
               <span className="sr-only sm:not-sr-only">Password</span>
             </Button>
           )}
+          {loggedIn && <NotificationMenu />}
           {loggedIn ? (
             <form action={logoutAction}>
       <CsrfInput />

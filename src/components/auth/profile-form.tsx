@@ -57,7 +57,7 @@ export function ProfileForm({
           className="opacity-70"
         />
         <p className="text-xs text-muted-foreground">
-          Email cannot be changed here — contact an administrator if needed.
+          Email cannot be changed here - contact an administrator if needed.
         </p>
       </div>
       <div className="space-y-1.5">

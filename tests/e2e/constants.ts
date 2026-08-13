@@ -11,7 +11,7 @@ export const APP_DIR = path.resolve(__dirname, "../..");
 export const TEST_DB_URL =
   process.env.E2E_DATABASE_URL ??
   process.env.DATABASE_URL ??
-  "postgresql://neondb_owner:password@localhost:5432/neondb?sslmode=require";
+  "postgresql://neondb_owner:password@localhost:5432/neondb?sslmode=verify-full";
 
 /** The e2e dev server never touches the preview server's .next cache. */
 export const TEST_DIST_DIR = ".next-e2e";

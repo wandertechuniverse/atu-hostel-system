@@ -26,6 +26,7 @@ test("protected endpoints reject unauthenticated callers with 401", async ({ req
     "/api/users",
     "/api/activity",
     "/api/export",
+    "/api/smtp",
   ]) {
     const res = await request.get(path);
     expect(res.status(), path).toBe(401);

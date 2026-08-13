@@ -18,6 +18,7 @@ tags:
   - name: Payments
   - name: Users
   - name: Activity
+  - name: Smtp
 
 components:
   securitySchemes:
@@ -1097,4 +1098,71 @@ paths:
                       bookings: { type: array, items: { type: object, additionalProperties: true } }
                       payments: { type: array, items: { type: object, additionalProperties: true } }
                       activityLog: { type: array, items: { type: object, additionalProperties: true } }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /smtp:
+    get:
+      tags: [Smtp]
+      summary: SMTP integration status (admin only)
+      description: >
+        Safe snapshot of the configured mailer. The SMTP password is never
+        included.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      mode: { type: string, enum: [smtp, console] }
+                      enabled: { type: boolean }
+                      host: { type: [string, "null"] }
+                      port: { type: integer }
+                      secure: { type: boolean }
+                      hasAuth: { type: boolean }
+                      user: { type: [string, "null"] }
+                      from: { type: string }
+                      siteUrl: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Smtp]
+      summary: Verify SMTP or send a test email (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  enum: [verify, test]
+                to:
+                  type: string
+                  format: email
+                  description: Required when action is test.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      action: { type: string, enum: [verify, test] }
+                      ok: { type: boolean }
+                      message: { type: string }
+                      delivery:
+                        type: string
+                        enum: [sent, logged, failed, skipped]
+        "400": { $ref: "#/components/responses/Forbidden" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }

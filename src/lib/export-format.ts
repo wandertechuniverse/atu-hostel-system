@@ -5,7 +5,7 @@
  */
 
 export const EXPORT_FORMAT = "hbms-backup";
-export const EXPORT_VERSION = 1;
+export const EXPORT_VERSION = 2;
 
 /** Pure helper (unit-testable without a DB): drop credential fields. */
 export function redactUser(user: Record<string, unknown>) {
@@ -25,6 +25,7 @@ export type DatabaseExport = {
     bookings: number;
     payments: number;
     activityLog: number;
+    notifications: number;
   };
   users: Record<string, unknown>[];
   hostels: Record<string, unknown>[];
@@ -32,4 +33,5 @@ export type DatabaseExport = {
   bookings: Record<string, unknown>[];
   payments: Record<string, unknown>[];
   activityLog: Record<string, unknown>[];
+  notifications: Record<string, unknown>[];
 };

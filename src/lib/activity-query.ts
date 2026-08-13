@@ -13,7 +13,7 @@ export type ActivityFilters = {
   pageSize?: number;
 };
 
-/** Pure query parser — no database (unit-testable). */
+/** Pure query parser - no database (unit-testable). */
 export function parseActivityQuery(searchParams: URLSearchParams): ActivityFilters {
   const rawPage = Number(searchParams.get("page") ?? "1");
   const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;

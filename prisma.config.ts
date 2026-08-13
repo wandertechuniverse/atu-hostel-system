@@ -2,6 +2,9 @@
 // npm install --save-dev prisma dotenv
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
+import { normalizePostgresSslMode } from "./src/lib/postgres-url";
+
+const rawUrl = process.env["DIRECT_URL"] ?? process.env["DATABASE_URL"];
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -11,6 +14,6 @@ export default defineConfig({
   },
   datasource: {
     // Neon: use DIRECT_URL for migrate/push when available (non-pooled).
-    url: process.env["DIRECT_URL"] ?? process.env["DATABASE_URL"],
+    url: rawUrl ? normalizePostgresSslMode(rawUrl) : rawUrl,
   },
 });

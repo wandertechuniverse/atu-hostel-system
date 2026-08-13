@@ -28,8 +28,10 @@ import {
 } from "@/components/ui/table";
 import {
   DistributionList,
+  HostelRevenueChart,
   TrendBars,
 } from "@/components/admin/analytics-charts";
+import { AnalyticsLiveBar } from "@/components/admin/analytics-live";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 export const dynamic = "force-dynamic";
@@ -125,9 +127,9 @@ export default async function AdminAnalyticsPage({
           <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
           <p className="text-sm text-muted-foreground">
             {isAdmin
-              ? "Live KPIs, booking trends and revenue across all hostels."
-              : "Live KPIs and trends for your hostel only."}{" "}
-            Figures are computed from bookings and payments — never stored aggregates.
+              ? "Live charts for bookings, revenue, and occupancy across all hostels."
+              : "Live charts for your hostel only."}{" "}
+            Figures are computed from bookings and payments - never stored aggregates.
           </p>
         </div>
         <form method="get" className="flex items-center gap-2">
@@ -154,6 +156,8 @@ export default async function AdminAnalyticsPage({
           </button>
         </form>
       </div>
+
+      <AnalyticsLiveBar />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {kpiCards.map((card) => (
@@ -248,7 +252,8 @@ export default async function AdminAnalyticsPage({
             Full reports →
           </Link>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
+          <HostelRevenueChart rows={data.revenueByHostel} />
           <Table>
             <TableHeader>
               <TableRow>

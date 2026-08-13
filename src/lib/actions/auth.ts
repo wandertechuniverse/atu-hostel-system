@@ -154,7 +154,7 @@ export async function changePasswordAction(
 
 export type ProfileFormState = { ok?: boolean; error?: string };
 
-/** Self-service profile update (FR-9) — name, phone, department, student ID. */
+/** Self-service profile update (FR-9) - name, phone, department, student ID. */
 export async function updateProfileAction(
   _prev: ProfileFormState,
   formData: FormData,

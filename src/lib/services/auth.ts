@@ -16,7 +16,7 @@ import {
   isTokenExpired,
   RESET_TOKEN_TTL_MS,
 } from "@/lib/password-reset";
-import { mailerFor, showResetLinkInResponse } from "@/lib/mailer";
+import { sendPasswordReset, showResetLinkInResponse } from "@/lib/mailer";
 import {
   changePasswordSchema,
   forgotPasswordSchema,
@@ -72,7 +72,7 @@ export async function loginUser(input: { email: unknown; password: unknown }, ip
     throw validationError(parsed.error.issues[0]?.message ?? "Invalid input");
   }
 
-  // Serverless cold starts may boot an empty /tmp DB — plant demo accounts.
+  // Serverless cold starts may boot an empty /tmp DB - plant demo accounts.
   const { ensureDemoData } = await import("@/lib/ensure-demo-data");
   try {
     await ensureDemoData();
@@ -209,7 +209,7 @@ export async function changeOwnPassword(
 
 /**
  * Self-service profile update (FR-9). Role, email and isActive are never
- * taken from the client — only name, phone, department and student ID.
+ * taken from the client - only name, phone, department and student ID.
  */
 export async function updateOwnProfile(
   session: SessionData,
@@ -281,11 +281,12 @@ export async function updateOwnProfile(
 }
 
 /**
- * Forgot-password step 1: issue a single-use reset token and "email" it
- * (console mailer; the link is also returned for display in dev mode). The
- * response is identical whether or not the account exists, so the endpoint
- * cannot be used to enumerate users. Throttled per email+IP (SECURITY.md §3).
- * Returns { devResetUrl } only in development and only for a real account.
+ * Forgot-password step 1: issue a single-use reset token and email it
+ * (console mailer by default, SMTP when SMTP_HOST is set; the link is also
+ * returned for display in dev mode). The response is identical whether or not
+ * the account exists, so the endpoint cannot be used to enumerate users.
+ * Throttled per email+IP (SECURITY.md §3). Returns { devResetUrl } only in
+ * development and only for a real account.
  */
 export async function requestPasswordReset(
   input: { email: unknown },
@@ -324,7 +325,7 @@ export async function requestPasswordReset(
     });
 
     const resetUrl = buildResetUrl(origin, token);
-    await mailerFor().sendPasswordReset(user.email, resetUrl);
+    await sendPasswordReset(user.email, resetUrl);
     if (showResetLinkInResponse()) devResetUrl = resetUrl;
 
     await audit({

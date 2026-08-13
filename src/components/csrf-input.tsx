@@ -24,7 +24,7 @@ export function readCsrfCookie(): string {
  *
  * The proxy sets `hbms_csrf` on the response of the first navigation, so the
  * cookie is not available during SSR (request cookies are still empty). We
- * therefore fill the input on the client — and again on every submit — so
+ * therefore fill the input on the client - and again on every submit - so
  * Server Actions always receive a non-empty matching token.
  */
 export function CsrfInput() {

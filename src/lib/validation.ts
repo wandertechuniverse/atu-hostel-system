@@ -89,7 +89,7 @@ export const changePasswordSchema = z
   });
 
 /**
- * Student booking request (FR-6). Amount is never accepted from the client —
+ * Student booking request (FR-6). Amount is never accepted from the client -
  * it is snapshotted from the room. Rules/disclaimer must be accepted.
  */
 export const bookingRequestSchema = z.object({
@@ -225,6 +225,11 @@ export const paymentSubmissionSchema = z.object({
     .trim()
     .min(4, "Enter the transaction reference from your MoMo prompt")
     .max(30),
+});
+
+/** Admin notifications panel - send a test message through the configured mailer. */
+export const testEmailSchema = z.object({
+  to: z.string().trim().email("Enter a valid email address").max(100),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

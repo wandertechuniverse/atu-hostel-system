@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * POST /api/auth/forgot-password - public. Body: { "email": "…" }.
- * Issues a single-use reset token and mails the link (console mailer in this
+ * Issues a single-use reset token and mails the link (console or SMTP mailer;
  * build). The response is the same whether or not the account exists, so the
  * endpoint cannot enumerate users. In development the response carries
  * { "devResetUrl": "…" } so the demo is usable with no SMTP credentials;

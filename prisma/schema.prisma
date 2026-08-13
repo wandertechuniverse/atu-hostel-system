@@ -56,6 +56,7 @@ model User {
   emailVerifiedAt  DateTime?
   bookings         Booking[]
   logs             ActivityLog[]
+  notifications    Notification[]
   resetTokens      PasswordResetToken[]
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
@@ -154,4 +155,24 @@ model ActivityLog {
   subjectId   String?
   ipAddress   String?
   createdAt   DateTime @default(now())
+}
+
+/// In-app inbox row created when a transactional email is delivered (or
+/// logged to the console). Failures are stored with delivery = "failed"
+/// so the admin notifications panel can diagnose SMTP issues.
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String
+  href      String?
+  emailTo   String?
+  delivery  String    @default("logged") // sent | logged | failed | skipped
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
 }

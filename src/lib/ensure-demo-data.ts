@@ -28,7 +28,7 @@ async function ensureDemoDataOnce(): Promise<void> {
   try {
     count = await db.user.count();
   } catch (error) {
-    // Schema may be missing on a brand-new empty file — push is not available
+    // Schema may be missing on a brand-new empty file - push is not available
     // at runtime; surface a clear log and rethrow so the caller still fails
     // loudly rather than with "invalid password".
     console.error("[ensure-demo-data] cannot read users table:", error);
@@ -38,7 +38,7 @@ async function ensureDemoDataOnce(): Promise<void> {
   if (count > 0) return;
 
   console.warn(
-    "[ensure-demo-data] empty database — seeding demo accounts (password: password)",
+    "[ensure-demo-data] empty database - seeding demo accounts (password: password)",
   );
 
   const password = await bcrypt.hash("password", 12);

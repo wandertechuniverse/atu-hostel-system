@@ -93,7 +93,7 @@ export default function ProspectusPage() {
           <h2 className="font-semibold">4. Sample rules</h2>
           <ol className="mt-2 list-decimal space-y-1 pl-5 text-muted-foreground">
             <li>A booking is a request until a manager approves it.</li>
-            <li>Beds are allocated only for confirmed bookings — double allocation is blocked.</li>
+            <li>Beds are allocated only for confirmed bookings - double allocation is blocked.</li>
             <li>Payment is mock only; no real money is collected by this software.</li>
             <li>Managers only manage their own hostel; administrators oversee all hostels.</li>
           </ol>

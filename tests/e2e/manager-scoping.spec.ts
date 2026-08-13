@@ -36,4 +36,7 @@ test("manager cannot open admin-only screens", async ({ page }) => {
   await expect(page).toHaveURL(/\/admin$/);
   await page.goto("/admin/activity");
   await expect(page).toHaveURL(/\/admin$/);
+  await page.goto("/admin/notifications");
+  await expect(page).toHaveURL(/\/admin$|\/login/);
+  await expect(page.getByRole("link", { name: "Notifications" })).toHaveCount(0);
 });

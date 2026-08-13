@@ -6,6 +6,7 @@ import {
   roomSchema,
   loginSchema,
   registerSchema,
+  testEmailSchema,
 } from "@/lib/validation";
 
 describe("hostelSchema (Prompt 3 form)", () => {
@@ -109,6 +110,18 @@ describe("roomSchema", () => {
         status: "AVAILABLE",
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("testEmailSchema", () => {
+  it("accepts a valid address and rejects a malformed one", () => {
+    expect(testEmailSchema.safeParse({ to: "admin@atu.edu.gh" }).success).toBe(
+      true,
+    );
+    expect(testEmailSchema.safeParse({ to: "not-an-email" }).success).toBe(
+      false,
+    );
+    expect(testEmailSchema.safeParse({ to: "" }).success).toBe(false);
   });
 });
 

@@ -26,6 +26,10 @@ export default defineConfig({
       PORT: String(E2E_PORT),
       DATABASE_URL: TEST_DB_URL,
       NEXT_DIST_DIR: TEST_DIST_DIR,
+      // Keep the notifications panel on the console mailer so e2e
+      // never depends on a real SMTP inbox.
+      SMTP_HOST: "",
+      EMAIL_NOTIFICATIONS: "",
     },
   },
 });

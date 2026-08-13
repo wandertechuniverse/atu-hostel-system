@@ -3,6 +3,7 @@ import {
   BarChart3,
   Building2,
   CalendarCheck2,
+  Bell,
   KeyRound,
   LayoutDashboard,
   LineChart,
@@ -35,6 +36,7 @@ const nav = [
   { href: "/admin/payments", label: "Payments", icon: Wallet, adminOnly: false },
   { href: "/admin/reports", label: "Reports", icon: BarChart3, adminOnly: false },
   { href: "/admin/users", label: "Users", icon: Users, adminOnly: true },
+  { href: "/admin/notifications", label: "Notifications", icon: Bell, adminOnly: true },
   { href: "/admin/activity", label: "Audit log", icon: ScrollText, adminOnly: true },
 ];
 

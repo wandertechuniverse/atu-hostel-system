@@ -7,6 +7,7 @@ import {
   DatabaseBackup,
   LineChart,
   ScrollText,
+  Bell,
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -85,14 +86,26 @@ export default async function AdminOverviewPage() {
           db.booking.count(),
           db.payment.count(),
           db.activityLog.count(),
-        ]).then(([users, hostels, rooms, bookings, payments, activityLog]) => ({
-          users,
-          hostels,
-          rooms,
-          bookings,
-          payments,
-          activityLog,
-        })),
+          db.notification.count(),
+        ]).then(
+          ([
+            users,
+            hostels,
+            rooms,
+            bookings,
+            payments,
+            activityLog,
+            notifications,
+          ]) => ({
+            users,
+            hostels,
+            rooms,
+            bookings,
+            payments,
+            activityLog,
+            notifications,
+          }),
+        ),
     isManager
       ? null
       : db.activityLog.findMany({
@@ -157,6 +170,15 @@ export default async function AdminOverviewPage() {
           </Link>
           {!isManager && (
             <Link
+              href="/admin/notifications"
+              className="inline-flex h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm hover:bg-muted"
+            >
+              <Bell className="size-4" />
+              Notifications
+            </Link>
+          )}
+          {!isManager && (
+            <Link
               href="/admin/activity"
               className="inline-flex h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm hover:bg-muted"
             >
@@ -203,8 +225,8 @@ export default async function AdminOverviewPage() {
               </CardTitle>
               <CardDescription>
                 Full JSON snapshot of every table - users (passwords excluded),
-                hostels, rooms, bookings, payments and the audit log. Every
-                export is recorded in the activity log.
+                hostels, rooms, bookings, payments, notifications and the
+                audit log. Every export is recorded in the activity log.
               </CardDescription>
             </div>
             <ExportDatabaseButton counts={exportCounts} />

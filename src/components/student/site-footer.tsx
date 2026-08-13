@@ -11,7 +11,7 @@ export function SiteFooter() {
           <p className="font-medium text-foreground">ATU Hostel Booking</p>
           <p className="text-xs leading-relaxed">
             Academic project for Accra Technical University (Diploma in Information
-            Technology). Payments are simulated — no real money is processed.
+            Technology). Payments are simulated - no real money is processed.
           </p>
         </div>
         <nav className="flex flex-wrap gap-x-4 gap-y-2 text-xs">
