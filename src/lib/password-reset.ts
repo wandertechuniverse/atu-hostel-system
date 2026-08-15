@@ -30,3 +30,24 @@ export function isTokenExpired(expiresAt: Date, now: Date = new Date()): boolean
 export function buildResetUrl(origin: string, token: string): string {
   return `${origin}/reset-password?token=${token}`;
 }
+
+/**
+ * Origin for reset emails. Production always uses NEXT_PUBLIC_SITE_URL so a
+ * spoofed Host header cannot rewrite the link. Development may fall back to
+ * the incoming request origin.
+ */
+export function resetLinkOrigin(
+  requestOrigin: string,
+  env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env,
+): string {
+  const configured = env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
+  if (env.NODE_ENV === "production") {
+    if (!configured) {
+      throw new Error(
+        "NEXT_PUBLIC_SITE_URL must be set in production for password-reset links.",
+      );
+    }
+    return configured;
+  }
+  return configured || requestOrigin.replace(/\/$/, "");
+}

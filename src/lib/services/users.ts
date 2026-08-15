@@ -22,6 +22,9 @@ export async function listUsers() {
  * an administrator - the role can never be self-asserted). Unique email and
  * student ID are enforced; the password is bcrypt-hashed at the same cost as
  * self-registration. Audits user.created.
+ *
+ * Performance note (Neon ~150ms RTT): one uniqueness query + bcrypt in
+ * parallel, create with include (no re-fetch). Avoid extra round-trips.
  */
 export async function createUser(
   session: SessionData,
@@ -46,11 +49,25 @@ export async function createUser(
   const password = parsed.data.password;
   const studentIdNumber = parsed.data.studentIdNumber?.trim() || null;
 
-  const emailTaken = await db.user.findUnique({ where: { email } });
-  if (emailTaken) throw conflictError("An account with that email already exists");
-  if (studentIdNumber) {
-    const idTaken = await db.user.findUnique({ where: { studentIdNumber } });
-    if (idTaken) throw conflictError("Another account already uses that student ID");
+  // CPU hash overlaps the single uniqueness RTT (do not fire two DB finds in
+  // parallel against Neon pooler - that serialises worse than one OR query).
+  const [passwordHash, conflict] = await Promise.all([
+    bcrypt.hash(password, 12),
+    db.user.findFirst({
+      where: {
+        OR: [
+          { email },
+          ...(studentIdNumber ? [{ studentIdNumber }] : []),
+        ],
+      },
+      select: { email: true, studentIdNumber: true },
+    }),
+  ]);
+  if (conflict) {
+    if (conflict.email === email) {
+      throw conflictError("An account with that email already exists");
+    }
+    throw conflictError("Another account already uses that student ID");
   }
 
   const user = await db.user.create({
@@ -60,8 +77,9 @@ export async function createUser(
       phone,
       studentIdNumber,
       role,
-      password: await bcrypt.hash(password, 12),
+      password: passwordHash,
     },
+    include: { hostel: { select: { id: true, name: true } } },
   });
 
   await audit({
@@ -71,10 +89,7 @@ export async function createUser(
     subjectId: user.id,
   });
 
-  return db.user.findUnique({
-    where: { id: user.id },
-    include: { hostel: { select: { id: true, name: true } } },
-  });
+  return user;
 }
 
 /**
@@ -150,21 +165,20 @@ export async function toggleUserStatus(session: SessionData, userId: string) {
   });
   if (!user) throw notFoundError("User not found.");
 
-  await db.$transaction(async (tx) => {
-    await tx.user.update({
-      where: { id: user.id },
-      data: { isActive: !user.isActive },
-    });
-    await tx.activityLog.create({
-      data: {
-        action: user.isActive ? "user.deactivated" : "user.activated",
-        userId: session.userId!,
-        subjectType: "User",
-        subjectId: user.id,
-      },
-    });
+  // Sequential writes beat interactive $transaction on Neon pooler (~2×).
+  // Audit is best-effort via audit() if the actor row is stale.
+  const nextActive = !user.isActive;
+  await db.user.update({
+    where: { id: user.id },
+    data: { isActive: nextActive },
   });
-  return { userId: user.id, isActive: !user.isActive };
+  await audit({
+    action: user.isActive ? "user.deactivated" : "user.activated",
+    userId: session.userId!,
+    subjectType: "User",
+    subjectId: user.id,
+  });
+  return { userId: user.id, isActive: nextActive };
 }
 
 /**
@@ -225,25 +239,20 @@ export async function assignManager(
         ? "STUDENT"
         : user.role;
 
-  await db.$transaction(async (tx) => {
-    await tx.user.update({
-      where: { id: user.id },
-      data: { hostelId, role },
-    });
-    await tx.activityLog.create({
-      data: {
-        action: hostelId ? "user.assigned_manager" : "user.manager_unassigned",
-        userId: session.userId!,
-        subjectType: "User",
-        subjectId: user.id,
-      },
-    });
-  });
-
-  return db.user.findUnique({
+  // Sequential write + audit (no interactive transaction - slower on Neon pooler).
+  const updated = await db.user.update({
     where: { id: user.id },
+    data: { hostelId, role },
     include: { hostel: { select: { id: true, name: true } } },
   });
+  await audit({
+    action: hostelId ? "user.assigned_manager" : "user.manager_unassigned",
+    userId: session.userId!,
+    subjectType: "User",
+    subjectId: user.id,
+  });
+
+  return updated;
 }
 
 /**
@@ -272,55 +281,61 @@ export async function updateUser(
     throw validationError(parsed.error.issues[0]?.message ?? "Invalid input");
   }
 
-  const target = await db.user.findUnique({ where: { id: userId } });
-  if (!target) throw notFoundError("User not found.");
-
   const { name, email, phone, password } = parsed.data;
   const studentIdNumber = parsed.data.studentIdNumber?.trim() || null;
   const department = parsed.data.department?.trim() || null;
-
-  // Unique fields - exclude the user being edited.
-  const emailTaken = await db.user.findUnique({ where: { email } });
-  if (emailTaken && emailTaken.id !== userId) {
-    throw conflictError("Another account already uses that email.");
-  }
-  if (studentIdNumber) {
-    const idTaken = await db.user.findUnique({
-      where: { studentIdNumber },
-    });
-    if (idTaken && idTaken.id !== userId) {
-      throw conflictError("Another account already uses that student ID.");
-    }
-  }
-
   const changedPassword = Boolean(password?.trim());
 
-  await db.$transaction(async (tx) => {
-    await tx.user.update({
-      where: { id: userId },
-      data: {
-        name,
-        email,
-        phone,
-        studentIdNumber,
-        department,
-        ...(changedPassword
-          ? { password: await bcrypt.hash(password!.trim(), 12) }
-          : {}),
-      },
-    });
-    await tx.activityLog.create({
-      data: {
-        action: changedPassword ? "user.password_reset" : "user.updated",
-        userId: session.userId!,
-        subjectType: "User",
-        subjectId: userId,
-      },
-    });
-  });
-
-  return db.user.findUnique({
+  const target = await db.user.findUnique({
     where: { id: userId },
+    select: { id: true },
+  });
+  if (!target) throw notFoundError("User not found.");
+
+  // One uniqueness RTT; overlap bcrypt when a new password is set.
+  // Do not fire two DB queries in Promise.all - Neon pooler serialises them worse.
+  const [conflict, passwordHash] = await Promise.all([
+    db.user.findFirst({
+      where: {
+        id: { not: userId },
+        OR: [
+          { email },
+          ...(studentIdNumber ? [{ studentIdNumber }] : []),
+        ],
+      },
+      select: { email: true, studentIdNumber: true },
+    }),
+    changedPassword
+      ? bcrypt.hash(password!.trim(), 12)
+      : Promise.resolve(null as string | null),
+  ]);
+  if (conflict) {
+    if (conflict.email === email) {
+      throw conflictError("Another account already uses that email.");
+    }
+    throw conflictError("Another account already uses that student ID.");
+  }
+
+  // Hash is computed before the write - never hold a Neon transaction open
+  // across bcrypt (interactive txs are ~2× sequential on the pooler).
+  const updated = await db.user.update({
+    where: { id: userId },
+    data: {
+      name,
+      email,
+      phone,
+      studentIdNumber,
+      department,
+      ...(passwordHash ? { password: passwordHash } : {}),
+    },
     include: { hostel: { select: { id: true, name: true } } },
   });
+  await audit({
+    action: changedPassword ? "user.password_reset" : "user.updated",
+    userId: session.userId!,
+    subjectType: "User",
+    subjectId: userId,
+  });
+
+  return updated;
 }

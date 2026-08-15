@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { CsrfInput } from "@/components/csrf-input";
+import { toast } from "sonner";
 import { Check, Pencil, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { FormSelect } from "@/components/admin/form-select";
+import { RoomImageField } from "@/components/admin/room-image-field";
 import {
   deleteRoomAction,
   roomFormAction,
@@ -36,6 +38,7 @@ type RoomRow = {
   pricePerSemester: number;
   status: "AVAILABLE" | "MAINTENANCE" | "CLOSED";
   description: string | null;
+  featuredImage: string | null;
 };
 
 export function RoomsDialog({
@@ -61,12 +64,29 @@ export function RoomsDialog({
     initial,
   );
 
+  useEffect(() => {
+    if (addState.ok) toast.success("Room added");
+    else if (addState.error) toast.error(addState.error);
+  }, [addState]);
+  useEffect(() => {
+    if (editState.ok) {
+      toast.success("Room updated");
+      setEditingId(null);
+    } else if (editState.error) {
+      toast.error(editState.error);
+    }
+  }, [editState]);
+  useEffect(() => {
+    if (delState.ok) toast.success("Room removed");
+    else if (delState.error) toast.error(delState.error);
+  }, [delState]);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button size="sm" variant="outline" />}>
         Rooms
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Rooms - {hostelName}</DialogTitle>
           <DialogDescription>
@@ -75,7 +95,7 @@ export function RoomsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-60 space-y-1.5 overflow-auto pr-1">
+        <div className="max-h-[50vh] space-y-2 overflow-auto pr-1">
           {rooms.length === 0 && (
             <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
               No rooms yet - add the first one below.
@@ -130,17 +150,25 @@ export function RoomsDialog({
                 </div>
               </div>
 
+              <div className="mt-2">
+                <RoomImageField
+                  roomId={room.id}
+                  roomNumber={room.roomNumber}
+                  currentImage={room.featuredImage}
+                />
+              </div>
+
               {editingId === room.id && (
                 <form
                   action={editAction}
-                  className="mt-2 grid grid-cols-2 gap-3 rounded-md border bg-muted/30 p-3"
+                  className="mt-2 grid grid-cols-1 gap-3 rounded-md border bg-muted/30 p-3 sm:grid-cols-2"
                 >
       <CsrfInput />
                   <input type="hidden" name="hostelId" value={hostelId} />
                   <input type="hidden" name="roomId" value={room.id} />
                   {editState.error && (
                     <p
-                      className="col-span-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                      className="sm:col-span-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
                       role="alert"
                     >
                       {editState.error}
@@ -243,7 +271,7 @@ export function RoomsDialog({
               {addState.error}
             </p>
           )}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor={`room-number-${hostelId}`}>Room number</Label>
               <Input
@@ -289,7 +317,7 @@ export function RoomsDialog({
                 required
               />
             </div>
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <FormSelect
                 id={`room-status-${hostelId}`}
                 label="Status"

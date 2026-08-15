@@ -38,7 +38,7 @@ export default function DisclaimerPage() {
         <h2 className="text-base font-semibold">3. Demo data &amp; accounts</h2>
         <p>
           Seeded accounts (for example <code>admin@atu.edu.gh</code> /{" "}
-          <code>password</code>) and sample hostels are for testing. On public demo
+          <code>Demo@ATU2026</code>) and sample hostels are for testing. On public demo
           hosts, data may reset when serverless instances restart. Do not store
           sensitive personal or financial information you are not willing to lose.
         </p>

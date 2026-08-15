@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { toast } from "sonner";
 import { CsrfInput } from "@/components/csrf-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,11 @@ export function ProfileForm({
     initial,
   );
   const isStudent = user.role === "STUDENT";
+
+  useEffect(() => {
+    if (state.ok) toast.success("Profile saved");
+    else if (state.error) toast.error(state.error);
+  }, [state]);
 
   return (
     <form action={formAction} className="space-y-4">

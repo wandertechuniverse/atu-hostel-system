@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { CsrfInput } from "@/components/csrf-input";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   assignManagerAction,
@@ -23,27 +24,32 @@ export function ManagerAssignmentForm({
     assignManagerAction,
     initial,
   );
+
+  useEffect(() => {
+    if (state.ok) toast.success("Hostel assignment saved");
+    else if (state.error) toast.error(state.error);
+  }, [state]);
   // Controlled so the user's selection is submitted with the form. The parent
   // keys this component on the assignment, so a saved change remounts it with
   // the fresh prop - the select never shows a stale value after revalidation.
   const [selected, setSelected] = useState(currentHostelId ?? "");
 
   return (
-    <form action={formAction} className="flex flex-col items-end gap-1">
+    <form action={formAction} className="flex w-full flex-col gap-1">
       <CsrfInput />
       <input type="hidden" name="userId" value={userId} />
       {state.error && (
-        <p className="text-right text-xs text-destructive" role="alert">
+        <p className="text-xs text-destructive" role="alert">
           {state.error}
         </p>
       )}
-      <div className="flex items-center gap-1.5">
+      <div className="flex w-full flex-wrap items-center gap-1.5">
         <select
           name="hostelId"
           value={selected}
           onChange={(event) => setSelected(event.target.value)}
           disabled={pending}
-          className="h-7 max-w-40 rounded-md border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="h-8 min-w-0 flex-1 rounded-md border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <option value="">- No hostel -</option>
           {hostels.map((hostel) => {

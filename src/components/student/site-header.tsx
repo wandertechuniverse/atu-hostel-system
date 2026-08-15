@@ -10,9 +10,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationMenu } from "@/components/notifications/notification-menu";
+import { StudentNavMenu } from "@/components/student/student-nav-menu";
 import { getSession } from "@/lib/auth";
 import { logoutAction } from "@/lib/actions/auth";
 import { CsrfInput } from "@/components/csrf-input";
+import {
+  homeForRole,
+  STUDENT_BOOKINGS,
+  STUDENT_PROFILE,
+} from "@/lib/paths";
 
 export async function SiteHeader() {
   const session = await getSession();
@@ -36,36 +42,62 @@ export async function SiteHeader() {
             sr-only keeps the accessible names for screen readers. */}
         <nav className="flex items-center gap-1 sm:gap-2">
           {loggedIn && session.role !== "STUDENT" && (
-            <Button render={<Link href="/admin" />} nativeButton={false} variant="ghost" size="sm">
+            <Button
+              render={<Link href={homeForRole(session.role)} />}
+              nativeButton={false}
+              variant="ghost"
+              size="sm"
+              className="hidden md:inline-flex"
+            >
               <LayoutDashboard className="size-4" />
-              <span className="sr-only sm:not-sr-only">Dashboard</span>
+              <span>Dashboard</span>
             </Button>
           )}
           {loggedIn && (
-            <Button render={<Link href="/my-bookings" />} nativeButton={false} variant="ghost" size="sm">
+            <Button
+              render={<Link href={STUDENT_BOOKINGS} />}
+              nativeButton={false}
+              variant="ghost"
+              size="sm"
+              className="hidden md:inline-flex"
+            >
               <User className="size-4" />
-              <span className="sr-only sm:not-sr-only">My bookings</span>
+              <span>My bookings</span>
             </Button>
           )}
           {loggedIn && (
-            <Button render={<Link href="/profile" />} nativeButton={false} variant="ghost" size="sm">
+            <Button
+              render={<Link href={STUDENT_PROFILE} />}
+              nativeButton={false}
+              variant="ghost"
+              size="sm"
+              className="hidden md:inline-flex"
+            >
               <UserCircle className="size-4" />
-              <span className="sr-only sm:not-sr-only">Profile</span>
+              <span>Profile</span>
             </Button>
           )}
           {loggedIn && (
-            <Button render={<Link href="/change-password" />} nativeButton={false} variant="ghost" size="sm">
+            <Button
+              render={<Link href="/change-password" aria-label="Change password" />}
+              nativeButton={false}
+              variant="ghost"
+              size="sm"
+              className="hidden md:inline-flex"
+            >
               <KeyRound className="size-4" />
-              <span className="sr-only sm:not-sr-only">Password</span>
+              <span aria-hidden>Password</span>
             </Button>
           )}
-          {loggedIn && <NotificationMenu />}
+          {loggedIn && session.userId && session.role && (
+            <NotificationMenu userId={session.userId} role={session.role} />
+          )}
           {loggedIn ? (
-            <form action={logoutAction}>
-      <CsrfInput />
+            <form action={logoutAction} className="hidden md:block">
+              <CsrfInput />
               <Button type="submit" variant="ghost" size="sm">
                 <LogOut className="size-4" />
-                <span className="sr-only sm:not-sr-only">Log out</span>
+                <span>Log out</span>
               </Button>
             </form>
           ) : (
@@ -74,6 +106,7 @@ export async function SiteHeader() {
             </Button>
           )}
           <ThemeToggle />
+          {loggedIn && <StudentNavMenu role={session.role} />}
         </nav>
       </div>
     </header>

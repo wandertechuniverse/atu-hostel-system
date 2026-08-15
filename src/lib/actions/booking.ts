@@ -30,7 +30,7 @@ export async function createBookingAction(
   } catch (error) {
     return { error: errorMessage(error) };
   }
-  redirect("/my-bookings?submitted=1");
+  redirect("/student/bookings?submitted=1");
 }
 
 /**
@@ -59,6 +59,7 @@ export async function submitPaymentAction(
   } catch (error) {
     return { error: errorMessage(error) };
   }
+  revalidatePath("/student/bookings");
   revalidatePath("/my-bookings");
   return { ok: true };
 }

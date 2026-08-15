@@ -20,6 +20,12 @@ import {
 } from "@/components/ui/table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { VerifyPaymentButton } from "@/components/admin/verify-payment-button";
+import {
+  MobileField,
+  MobileFieldRow,
+  MobileRecord,
+} from "@/components/mobile-fields";
+import { staffPath } from "@/lib/paths";
 
 export const dynamic = "force-dynamic";
 
@@ -43,52 +49,73 @@ export default async function AdminPaymentsPage({
 
   const baseWhere = paymentScopeWhere(session);
 
-  const payments = await db.payment.findMany({
-    where: {
-      ...baseWhere,
-      ...(status ? { status } : {}),
-      ...(q
-        ? {
-            OR: [
-              { reference: { contains: q, mode: "insensitive" } },
-              { booking: { user: { name: { contains: q, mode: "insensitive" } } } },
-              {
-                booking: {
-                  user: { studentIdNumber: { contains: q, mode: "insensitive" } },
+  const listWhere = {
+    ...baseWhere,
+    ...(status ? { status } : {}),
+    ...(q
+      ? {
+          OR: [
+            { reference: { contains: q, mode: "insensitive" as const } },
+            {
+              booking: {
+                user: { name: { contains: q, mode: "insensitive" as const } },
+              },
+            },
+            {
+              booking: {
+                user: {
+                  studentIdNumber: {
+                    contains: q,
+                    mode: "insensitive" as const,
+                  },
                 },
               },
-              {
-                booking: {
-                  room: { hostel: { name: { contains: q, mode: "insensitive" } } },
+            },
+            {
+              booking: {
+                room: {
+                  hostel: {
+                    name: { contains: q, mode: "insensitive" as const },
+                  },
                 },
               },
-            ],
-          }
-        : {}),
-    },
-    include: {
-      booking: {
-        select: {
-          id: true,
-          amount: true,
-          user: { select: { name: true, studentIdNumber: true } },
-          room: {
-            select: { roomNumber: true, hostel: { select: { name: true } } },
+            },
+          ],
+        }
+      : {}),
+  };
+
+  // List + status chips in parallel (was sequential: two Neon RTTs stacked).
+  const [payments, counts] = await Promise.all([
+    db.payment.findMany({
+      where: listWhere,
+      include: {
+        booking: {
+          select: {
+            id: true,
+            amount: true,
+            user: { select: { name: true, studentIdNumber: true } },
+            room: {
+              select: {
+                roomNumber: true,
+                hostel: { select: { name: true } },
+              },
+            },
           },
         },
       },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const counts = await db.payment.groupBy({
-    by: ["status"],
-    where: baseWhere,
-    _count: { _all: true },
-  });
+      orderBy: { createdAt: "desc" },
+    }),
+    db.payment.groupBy({
+      by: ["status"],
+      where: baseWhere,
+      _count: { _all: true },
+    }),
+  ]);
   const countMap = Object.fromEntries(
     counts.map((c) => [c.status, c._count._all]),
   );
+  const base = staffPath(session.role, "/payments");
 
   return (
     <div className="space-y-6">
@@ -103,7 +130,7 @@ export default async function AdminPaymentsPage({
 
       <div className="flex flex-wrap gap-2">
         <Link
-          href="/admin/payments"
+          href={base}
           className={`rounded-full border px-3 py-1 text-xs ${
             !status ? "bg-primary text-primary-foreground" : "hover:bg-muted"
           }`}
@@ -113,7 +140,7 @@ export default async function AdminPaymentsPage({
         {STATUSES.map((s) => (
           <Link
             key={s}
-            href={`/admin/payments?status=${s}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+            href={`${base}?status=${s}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
             className={`rounded-full border px-3 py-1 text-xs ${
               status === s
                 ? "bg-primary text-primary-foreground"
@@ -153,7 +180,7 @@ export default async function AdminPaymentsPage({
             </button>
             {q && (
               <Link
-                href={status ? `/admin/payments?status=${status}` : "/admin/payments"}
+                href={status ? `${base}?status=${status}` : base}
                 className="text-xs text-muted-foreground underline-offset-4 hover:underline"
               >
                 Clear
@@ -162,6 +189,49 @@ export default async function AdminPaymentsPage({
           </form>
         </CardHeader>
         <CardContent>
+          <div className="space-y-3 lg:hidden">
+            {payments.length === 0 && (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                No payments match.
+              </p>
+            )}
+            {payments.map((payment) => (
+              <MobileRecord key={payment.id}>
+                <MobileField label="Student">
+                  <p className="font-medium">{payment.booking.user.name}</p>
+                  {payment.booking.user.studentIdNumber ? (
+                    <p className="text-xs text-muted-foreground">
+                      {payment.booking.user.studentIdNumber}
+                    </p>
+                  ) : null}
+                </MobileField>
+                <MobileField label="Hostel">
+                  {payment.booking.room.hostel.name}
+                </MobileField>
+                <MobileField label="Room">{payment.booking.room.roomNumber}</MobileField>
+                <MobileField label="Reference">
+                  <span className="break-all font-mono text-xs">
+                    {payment.reference}
+                  </span>
+                </MobileField>
+                <MobileField label="Amount">
+                  <span className="font-medium">
+                    GH₵ {payment.amountPaid.toLocaleString()}
+                  </span>
+                </MobileField>
+                <MobileFieldRow>
+                  <MobileField label="Method">{payment.method}</MobileField>
+                  <MobileField label="Status">
+                    <StatusBadge status={payment.status} />
+                  </MobileField>
+                </MobileFieldRow>
+                {payment.status === "PENDING" ? (
+                  <VerifyPaymentButton bookingId={payment.booking.id} />
+                ) : null}
+              </MobileRecord>
+            ))}
+          </div>
+          <div className="hidden min-w-0 overflow-x-auto lg:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -214,6 +284,7 @@ export default async function AdminPaymentsPage({
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

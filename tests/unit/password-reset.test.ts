@@ -5,6 +5,7 @@ import {
   hashResetToken,
   isTokenExpired,
   RESET_TOKEN_TTL_MS,
+  resetLinkOrigin,
 } from "@/lib/password-reset";
 import {
   forgotPasswordSchema,
@@ -35,6 +36,29 @@ describe("reset token helpers", () => {
   it("builds a reset URL carrying the token", () => {
     const url = buildResetUrl("http://localhost:3000", "abc123");
     expect(url).toBe("http://localhost:3000/reset-password?token=abc123");
+  });
+});
+
+describe("resetLinkOrigin", () => {
+  it("uses NEXT_PUBLIC_SITE_URL in production and ignores Host", () => {
+    expect(
+      resetLinkOrigin("http://evil.example", {
+        NODE_ENV: "production",
+        NEXT_PUBLIC_SITE_URL: "https://hbms.example/",
+      }),
+    ).toBe("https://hbms.example");
+  });
+
+  it("throws in production when NEXT_PUBLIC_SITE_URL is missing", () => {
+    expect(() =>
+      resetLinkOrigin("http://evil.example", { NODE_ENV: "production" }),
+    ).toThrow(/NEXT_PUBLIC_SITE_URL/);
+  });
+
+  it("falls back to the request origin outside production", () => {
+    expect(resetLinkOrigin("http://localhost:3000/", {})).toBe(
+      "http://localhost:3000",
+    );
   });
 });
 

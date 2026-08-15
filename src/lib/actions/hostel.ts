@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
+import { revalidateStaff } from "@/lib/revalidate-staff";
 import { requireCsrf } from "@/lib/csrf";
 import { errorMessage } from "@/lib/services/errors";
 import {
@@ -10,10 +11,12 @@ import {
   deleteHostel,
   deleteRoom,
   removeHostelImage,
+  removeRoomImage,
   setHostelManager,
   updateHostel,
   updateRoom,
   uploadHostelImage,
+  uploadRoomImage,
 } from "@/lib/services/hostels";
 
 export type HostelFormState = { ok?: boolean; error?: string };
@@ -56,8 +59,8 @@ export async function hostelFormAction(
     return { error: errorMessage(error) };
   }
 
-  revalidatePath("/admin/hostels");
-  revalidatePath("/admin");
+  revalidateStaff("/hostels");
+  revalidateStaff();
   return { ok: true };
 }
 
@@ -83,9 +86,9 @@ export async function setHostelManagerAction(
     return { error: errorMessage(error) };
   }
 
-  revalidatePath("/admin/hostels");
+  revalidateStaff("/hostels");
   revalidatePath("/admin/users");
-  revalidatePath("/admin");
+  revalidateStaff();
   return { ok: true };
 }
 
@@ -117,8 +120,8 @@ export async function uploadHostelImageAction(
     return { error: errorMessage(error) };
   }
 
-  revalidatePath("/admin/hostels");
-  revalidatePath("/admin");
+  revalidateStaff("/hostels");
+  revalidateStaff();
   revalidatePath("/");
   return { ok: true, path: updated.featuredImage ?? undefined };
 }
@@ -137,8 +140,58 @@ export async function removeHostelImageAction(
     return { error: errorMessage(error) };
   }
 
-  revalidatePath("/admin/hostels");
-  revalidatePath("/admin");
+  revalidateStaff("/hostels");
+  revalidateStaff();
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** Replace a room photo (manager: own hostel; admin: any). */
+export async function uploadRoomImageAction(
+  _prev: UploadImageState,
+  formData: FormData,
+): Promise<UploadImageState> {
+  try {
+    await requireCsrf(formData);
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
+  const session = await requireRole("MANAGER", "ADMIN");
+  const file = formData.get("file");
+  if (!(file instanceof File)) {
+    return { error: "Choose an image to upload." };
+  }
+  let updated: { featuredImage: string | null };
+  try {
+    updated = await uploadRoomImage(session, String(formData.get("roomId") ?? ""), {
+      type: file.type,
+      size: file.size,
+      bytes: new Uint8Array(await file.arrayBuffer()),
+    });
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
+  revalidateStaff("/hostels");
+  revalidateStaff();
+  revalidatePath("/");
+  return { ok: true, path: updated.featuredImage ?? undefined };
+}
+
+/** Remove a room photo (manager: own hostel; admin: any). */
+export async function removeRoomImageAction(
+  _prev: HostelFormState,
+  formData: FormData,
+): Promise<HostelFormState> {
+  const csrf = await guardCsrf(formData);
+  if (csrf) return csrf;
+  const session = await requireRole("MANAGER", "ADMIN");
+  try {
+    await removeRoomImage(session, String(formData.get("roomId") ?? ""));
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
+  revalidateStaff("/hostels");
+  revalidateStaff();
   revalidatePath("/");
   return { ok: true };
 }
@@ -169,8 +222,8 @@ export async function roomFormAction(
     return { error: errorMessage(error) };
   }
 
-  revalidatePath("/admin/hostels");
-  revalidatePath("/admin");
+  revalidateStaff("/hostels");
+  revalidateStaff();
   return { ok: true };
 }
 
@@ -187,8 +240,8 @@ export async function deleteRoomAction(
     return { error: errorMessage(error) };
   }
 
-  revalidatePath("/admin/hostels");
-  revalidatePath("/admin");
+  revalidateStaff("/hostels");
+  revalidateStaff();
   return { ok: true };
 }
 
@@ -206,8 +259,8 @@ export async function deleteHostelAction(
     return { error: errorMessage(error) };
   }
 
-  revalidatePath("/admin/hostels");
-  revalidatePath("/admin");
+  revalidateStaff("/hostels");
+  revalidateStaff();
   revalidatePath("/");
   return { ok: true };
 }

@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { defineConfig } from "@playwright/test";
 import { APP_DIR, BASE_URL, TEST_DB_URL, TEST_DIST_DIR, E2E_PORT } from "./tests/e2e/constants";
 
@@ -15,7 +16,7 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: `bun run dev -- --port ${E2E_PORT}`,
+    command: `bun -e "require('node:fs').rmSync('.next-e2e',{recursive:true,force:true})" && bun run dev -- --port ${E2E_PORT}`,
     cwd: APP_DIR,
     url: BASE_URL,
     reuseExistingServer: false,

@@ -127,7 +127,7 @@ story.append(Paragraph("5. Documents &amp; contacts", styles["H"]))
 story.append(
     Paragraph(
         "In the live system: search on the student home page, open a hostel detail page for rooms, "
-        "request booking, track status under <b>My bookings</b>. Demo admin: admin@atu.edu.gh / password. "
+        "request booking, track status under <b>My bookings</b>. Demo admin: admin@atu.edu.gh / Demo@ATU2026. "
         "Legal pages: /disclaimer and /privacy.",
         styles["Body"],
     )

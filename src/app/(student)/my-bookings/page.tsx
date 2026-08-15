@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireSession } from "@/lib/auth";
+import { homeForRole, requireSession } from "@/lib/auth";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
   Table,
@@ -14,6 +14,11 @@ import {
 import { ReceiptDialog } from "@/components/student/receipt-dialog";
 import { PayDialog } from "@/components/student/pay-dialog";
 import { BookingSuccessToast } from "@/components/student/booking-success-toast";
+import {
+  MobileField,
+  MobileFieldRow,
+  MobileRecord,
+} from "@/components/mobile-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +30,7 @@ export default async function MyBookingsPage({
   const sp = await searchParams;
   const justSubmitted = sp.submitted === "1";
   const session = await requireSession();
-  if (session.role !== "STUDENT") redirect("/admin");
+  if (session.role !== "STUDENT") redirect(homeForRole(session.role));
 
   // Row-level security: a student only ever sees their own bookings.
   const bookings = await db.booking.findMany({
@@ -66,7 +71,75 @@ export default async function MyBookingsPage({
             to get started.
           </p>
         ) : (
-          <Table className="mt-6">
+          <>
+          <div className="mt-6 space-y-3 lg:hidden">
+            {bookings.map((booking) => (
+              <MobileRecord key={booking.id}>
+                <MobileField label="Hostel">
+                  <p className="font-medium">{booking.room.hostel.name}</p>
+                </MobileField>
+                <MobileField label="Room">
+                  {booking.room.roomNumber} · {booking.room.roomType}
+                </MobileField>
+                <MobileField label="Session">{booking.academicSession}</MobileField>
+                <MobileField label="Amount">
+                  <span className="font-medium">
+                    GH₵ {booking.amount.toLocaleString()}
+                  </span>
+                </MobileField>
+                <MobileFieldRow>
+                  <MobileField label="Status">
+                    <StatusBadge status={booking.status} />
+                  </MobileField>
+                  <MobileField label="Payment">
+                    {booking.payment ? (
+                      <StatusBadge status={booking.payment.status} />
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </MobileField>
+                </MobileFieldRow>
+                <div>
+                  {booking.payment?.status === "SUCCESS" ? (
+                    <ReceiptDialog
+                      booking={{
+                        id: booking.id,
+                        amount: booking.amount,
+                        academicSession: booking.academicSession,
+                        status: booking.status,
+                        createdAt: booking.createdAt,
+                        user: booking.user,
+                        room: {
+                          roomNumber: booking.room.roomNumber,
+                          roomType: booking.room.roomType,
+                          hostel: {
+                            name: booking.room.hostel.name,
+                            location: booking.room.hostel.location,
+                          },
+                        },
+                        payment: booking.payment
+                          ? {
+                              reference: booking.payment.reference,
+                              amountPaid: booking.payment.amountPaid,
+                              paymentDate: booking.payment.paymentDate,
+                              status: booking.payment.status,
+                            }
+                          : null,
+                      }}
+                    />
+                  ) : booking.payment?.status === "PENDING" ? (
+                    <span className="text-xs text-muted-foreground">
+                      Awaiting verification
+                    </span>
+                  ) : booking.status === "CONFIRMED" ? (
+                    <PayDialog bookingId={booking.id} amount={booking.amount} />
+                  ) : null}
+                </div>
+              </MobileRecord>
+            ))}
+          </div>
+          <div className="mt-6 hidden min-w-0 overflow-x-auto lg:block">
+          <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Hostel</TableHead>
@@ -144,6 +217,8 @@ export default async function MyBookingsPage({
               ))}
             </TableBody>
           </Table>
+          </div>
+          </>
         )}
     </main>
   );

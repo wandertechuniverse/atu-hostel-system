@@ -23,6 +23,11 @@ import { HostelImageDialog } from "@/components/admin/hostel-image-dialog";
 import { HostelManagerDialog } from "@/components/admin/hostel-manager-dialog";
 import { HostelApprovalButton } from "@/components/admin/hostel-approval-button";
 import { DeleteHostelButton } from "@/components/admin/delete-hostel-button";
+import {
+  MobileField,
+  MobileFieldRow,
+  MobileRecord,
+} from "@/components/mobile-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -37,26 +42,27 @@ export default async function AdminHostelsPage() {
       include: {
         manager: { select: { id: true, name: true } },
         rooms: {
-        select: {
-          id: true,
-          roomNumber: true,
-          roomType: true,
-          capacity: true,
-          pricePerSemester: true,
-          status: true,
-          description: true,
+          select: {
+            id: true,
+            roomNumber: true,
+            roomType: true,
+            capacity: true,
+            pricePerSemester: true,
+            status: true,
+            description: true,
+            featuredImage: true,
+          },
         },
       },
-      },
       orderBy: { name: "asc" },
     }),
-    // Everyone who could run a hostel: students (promoted on assignment) and
-    // current managers. Admins are never scoped to a single hostel.
-    db.user.findMany({
-      where: { role: { in: ["STUDENT", "MANAGER"] } },
-      select: { id: true, name: true, email: true, role: true },
-      orderBy: { name: "asc" },
-    }),
+    isManager
+      ? Promise.resolve([])
+      : db.user.findMany({
+          where: { role: { in: ["STUDENT", "MANAGER"] } },
+          select: { id: true, name: true, email: true, role: true },
+          orderBy: { name: "asc" },
+        }),
   ]);
 
   // Managers without a hostel can create one (they become its manager);
@@ -86,6 +92,102 @@ export default async function AdminHostelsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="space-y-3 lg:hidden">
+            {hostels.length === 0 && (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                No hostels found.
+              </p>
+            )}
+            {hostels.map((hostel) => {
+              const fromPrice = hostel.rooms.length
+                ? Math.min(...hostel.rooms.map((r) => r.pricePerSemester))
+                : null;
+              return (
+                <MobileRecord key={hostel.id}>
+                  <MobileField label="Name">
+                    <p className="font-medium">{hostel.name}</p>
+                  </MobileField>
+                  <MobileField label="Location">{hostel.location}</MobileField>
+                  <MobileFieldRow>
+                    <MobileField label="Type">
+                      <Badge
+                        variant={
+                          hostel.type === "UNIVERSITY" ? "default" : "secondary"
+                        }
+                      >
+                        {hostel.type === "UNIVERSITY" ? "On-campus" : "Private"}
+                      </Badge>
+                    </MobileField>
+                    <MobileField label="Published">
+                      {hostel.isApproved ? (
+                        <Badge variant="default">Published</Badge>
+                      ) : (
+                        <Badge variant="outline">Unpublished</Badge>
+                      )}
+                    </MobileField>
+                  </MobileFieldRow>
+                  <MobileField label="Rooms">
+                    {hostel.rooms.length}
+                    {fromPrice !== null
+                      ? ` · from GH₵ ${fromPrice.toLocaleString()}`
+                      : ""}
+                  </MobileField>
+                  {hostel.manager?.name ? (
+                    <MobileField label="Manager">{hostel.manager.name}</MobileField>
+                  ) : null}
+                  <div className="flex flex-wrap gap-1.5">
+                    <HostelDialog
+                      hostel={{
+                        id: hostel.id,
+                        name: hostel.name,
+                        type: hostel.type,
+                        location: hostel.location,
+                        contactNumber: hostel.contactNumber,
+                        description: hostel.description,
+                        facilities: hostel.facilities,
+                        latitude: hostel.latitude,
+                        longitude: hostel.longitude,
+                      }}
+                    />
+                    <RoomsDialog
+                      hostelId={hostel.id}
+                      hostelName={hostel.name}
+                      rooms={hostel.rooms}
+                    />
+                    <HostelImageDialog
+                      key={`m-${hostel.id}:${hostel.featuredImage ?? "none"}`}
+                      hostelId={hostel.id}
+                      hostelName={hostel.name}
+                      currentImage={hostel.featuredImage}
+                    />
+                    {session.role === "ADMIN" ? (
+                      <>
+                        <HostelManagerDialog
+                          key={`m-${hostel.id}:${hostel.manager?.id ?? "none"}`}
+                          hostelId={hostel.id}
+                          hostelName={hostel.name}
+                          currentManagerId={hostel.manager?.id ?? null}
+                          currentManagerName={hostel.manager?.name ?? null}
+                          candidates={managerCandidates}
+                        />
+                        <HostelApprovalButton
+                          key={`m-${hostel.id}:${hostel.isApproved}`}
+                          hostelId={hostel.id}
+                          isApproved={hostel.isApproved}
+                        />
+                        <DeleteHostelButton hostelId={hostel.id} />
+                      </>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        Publish: admin only
+                      </span>
+                    )}
+                  </div>
+                </MobileRecord>
+              );
+            })}
+          </div>
+          <div className="hidden min-w-0 overflow-x-auto lg:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -201,6 +303,7 @@ export default async function AdminHostelsPage() {
               })}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

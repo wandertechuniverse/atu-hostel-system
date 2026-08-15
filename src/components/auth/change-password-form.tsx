@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition, type FormEvent } from "react";
 import { CsrfInput } from "@/components/csrf-input";
+import { toast } from "sonner";
 import { CheckCircle2, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,7 +42,12 @@ export function ChangePasswordForm() {
     startTransition(async () => {
       const result = await changePasswordAction(initial, formData);
       setState(result);
-      if (result.ok) formRef.current?.reset();
+      if (result.ok) {
+        formRef.current?.reset();
+        toast.success("Password updated");
+      } else if (result.error) {
+        toast.error(result.error);
+      }
     });
   }
 

@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { CsrfInput } from "@/components/csrf-input";
+import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,7 +48,12 @@ export function DeleteUserDialog({
   // Close after a successful delete (the action revalidates the page, so the
   // row disappears).
   useEffect(() => {
-    if (state.ok) setOpen(false);
+    if (state.ok) {
+      toast.success("User deleted");
+      setOpen(false);
+    } else if (state.error) {
+      toast.error(state.error);
+    }
   }, [state]);
 
   if (isSelf) return null;
@@ -67,7 +73,7 @@ export function DeleteUserDialog({
                 ? `Has ${bookingCount} booking${bookingCount === 1 ? "" : "s"} on record - deactivate instead to preserve history`
                 : "Delete this account (admin only)"
             }
-            className="text-destructive hover:text-destructive"
+            className="w-full text-destructive hover:text-destructive"
           />
         }
       >

@@ -29,7 +29,7 @@ describe("imageExtensionFor", () => {
 });
 
 describe("isWithinImageSizeLimit", () => {
-  it("accepts files up to the 5 MB cap", () => {
+  it("accepts files up to the 10 MB cap", () => {
     expect(isWithinImageSizeLimit(1)).toBe(true);
     expect(isWithinImageSizeLimit(MAX_IMAGE_BYTES)).toBe(true);
   });

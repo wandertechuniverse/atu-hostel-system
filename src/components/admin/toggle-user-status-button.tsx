@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { CsrfInput } from "@/components/csrf-input";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   toggleUserStatusAction,
@@ -24,16 +25,24 @@ export function ToggleUserStatusButton({
     initial,
   );
 
+  useEffect(() => {
+    if (state.ok) {
+      toast.success(isActive ? "Account deactivated" : "Account activated");
+    } else if (state.error) {
+      toast.error(state.error);
+    }
+  }, [state, isActive]);
+
   if (isSelf) {
     return <span className="text-xs text-muted-foreground">You</span>;
   }
 
   return (
-    <form action={formAction} className="flex flex-col items-end gap-1">
+    <form action={formAction} className="flex w-full flex-col gap-1">
       <CsrfInput />
       <input type="hidden" name="userId" value={userId} />
       {state.error && (
-        <p className="text-right text-xs text-destructive" role="alert">
+        <p className="text-xs text-destructive" role="alert">
           {state.error}
         </p>
       )}
@@ -42,6 +51,7 @@ export function ToggleUserStatusButton({
         size="sm"
         variant={isActive ? "outline" : "default"}
         disabled={pending}
+        className="w-full"
       >
         {pending ? "Saving…" : isActive ? "Deactivate" : "Activate"}
       </Button>

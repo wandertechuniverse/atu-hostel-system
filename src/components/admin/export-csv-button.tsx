@@ -1,6 +1,7 @@
 "use client";
 
 import { Download } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 function escapeCell(value: unknown) {
@@ -45,6 +46,9 @@ export function ExportCsvButton({
         anchor.click();
         anchor.remove();
         URL.revokeObjectURL(url);
+        toast.success("CSV downloaded", {
+          description: `${rows.length} record${rows.length === 1 ? "" : "s"} · ${filename}`,
+        });
       }}
     >
       <Download className="size-4" />

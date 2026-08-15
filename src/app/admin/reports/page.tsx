@@ -21,6 +21,7 @@ import {
   ReportsRecords,
   type ReportRecord,
 } from "@/components/admin/reports-records";
+import { MobileField, MobileRecord } from "@/components/mobile-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -31,29 +32,46 @@ export default async function AdminReportsPage() {
   const isManager = session.role === "MANAGER";
 
   // Row-level security: hostels and payments are scoped at the source.
+  // Filtered relation counts avoid loading every booking id into memory.
+  const bookingWhere = isManager
+    ? { room: { hostelId: session.hostelId ?? "__none__" } }
+    : {};
+
   const [hostels, pendingPayments, bookingsForExport] = await Promise.all([
     db.hostel.findMany({
       where: hostelScopeWhere(session),
-      include: {
+      select: {
+        id: true,
+        name: true,
         rooms: {
-          include: {
-            bookings: {
-              where: { status: "CONFIRMED" },
-              select: { id: true },
+          select: {
+            capacity: true,
+            _count: {
+              select: { bookings: { where: { status: "CONFIRMED" } } },
             },
           },
         },
       },
       orderBy: { name: "asc" },
     }),
-    db.payment.count({ where: { ...paymentScopeWhere(session), status: "PENDING" } }),
+    db.payment.count({
+      where: { ...paymentScopeWhere(session), status: "PENDING" },
+    }),
     db.booking.findMany({
-      where: isManager
-        ? { room: { hostelId: session.hostelId ?? "__none__" } }
-        : {},
-      include: {
+      where: bookingWhere,
+      select: {
+        id: true,
+        amount: true,
+        status: true,
+        academicSession: true,
         user: { select: { name: true, studentIdNumber: true } },
-        room: { include: { hostel: { select: { id: true, name: true } } } },
+        room: {
+          select: {
+            roomNumber: true,
+            roomType: true,
+            hostel: { select: { id: true, name: true } },
+          },
+        },
         payment: { select: { status: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -64,7 +82,7 @@ export default async function AdminReportsPage() {
   const rows = hostels.map((hostel) => {
     const totalBeds = hostel.rooms.reduce((sum, room) => sum + room.capacity, 0);
     const confirmed = hostel.rooms.reduce(
-      (sum, room) => sum + room.bookings.length,
+      (sum, room) => sum + room._count.bookings,
       0,
     );
     const revenue = bookingsForExport
@@ -201,6 +219,24 @@ export default async function AdminReportsPage() {
             )}
           </div>
 
+          <div className="space-y-3 lg:hidden">
+            {rows.map((row) => (
+              <MobileRecord key={row.id}>
+                <MobileField label="Hostel">
+                  <p className="font-medium">{row.name}</p>
+                </MobileField>
+                <MobileField label="Rooms">{row.rooms}</MobileField>
+                <MobileField label="Beds">
+                  {row.confirmed}/{row.totalBeds} occupied
+                </MobileField>
+                <MobileField label="Occupancy">{row.occupancy}%</MobileField>
+                <MobileField label="Revenue">
+                  <span className="font-medium">{ghs(row.revenue)}</span>
+                </MobileField>
+              </MobileRecord>
+            ))}
+          </div>
+          <div className="hidden min-w-0 overflow-x-auto lg:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -229,6 +265,7 @@ export default async function AdminReportsPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 

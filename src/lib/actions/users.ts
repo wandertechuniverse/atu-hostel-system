@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
+import { revalidateStaff } from "@/lib/revalidate-staff";
 import { requireCsrf } from "@/lib/csrf";
 import { errorMessage } from "@/lib/services/errors";
 import {
@@ -119,7 +120,7 @@ export async function assignManagerAction(
   }
 
   revalidatePath("/admin/users");
-  revalidatePath("/admin/hostels");
+  revalidateStaff("/hostels");
   return { ok: true };
 }
 

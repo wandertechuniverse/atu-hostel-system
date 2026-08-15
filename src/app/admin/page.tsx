@@ -8,10 +8,11 @@ import {
   LineChart,
   ScrollText,
   Bell,
+  CalendarCheck2,
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { bookingScopeWhere, hostelScopeWhere } from "@/lib/scoping";
+import { bookingScopeWhere } from "@/lib/scoping";
 import { ExportDatabaseButton } from "@/components/admin/export-database-button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -30,8 +31,34 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { MobileField, MobileRecord } from "@/components/mobile-fields";
+import { staffPath } from "@/lib/paths";
 
 export const dynamic = "force-dynamic";
+
+type AdminOverviewStats = {
+  students: number;
+  campus: number;
+  priv: number;
+  activeBookings: number;
+  pendingBookings: number;
+  pendingPayments: number;
+  users: number;
+  hostels: number;
+  rooms: number;
+  bookings: number;
+  payments: number;
+  activityLog: number;
+  notifications: number;
+};
+
+type ManagerOverviewStats = {
+  students: number;
+  rooms: number;
+  activeBookings: number;
+  pendingBookings: number;
+  pendingPayments: number;
+};
 
 export default async function AdminOverviewPage() {
   const session = await requireRole("MANAGER", "ADMIN");
@@ -39,35 +66,60 @@ export default async function AdminOverviewPage() {
 
   // Row-level security: all queries carry the role's scope at the source.
   const bookingWhere = bookingScopeWhere(session);
-  const paymentWhere = isManager
-    ? { booking: { room: { hostelId: session.hostelId ?? "__none__" } } }
-    : {};
+  // Neon is ~150ms RTT from many client networks: many small COUNT queries
+  // do not parallelise well through the pooler. Prefer one multi-count SQL
+  // round-trip for the dashboard cards, then fetch the small recent lists.
+  const hostelId = session.hostelId ?? "__none__";
 
-  const [
-    students,
-    hostelsByType,
-    activeBookings,
-    pendingPayments,
-    recentBookings,
-    exportCounts,
-    recentAudit,
-  ] = await Promise.all([
+  const [stats, managedHostel, recentBookings, recentAudit] = await Promise.all([
     isManager
-      ? db.booking
-          .findMany({
-            where: bookingWhere,
-            distinct: ["userId"],
-            select: { userId: true },
-          })
-          .then((rows) => rows.length)
-      : db.user.count({ where: { role: "STUDENT" } }),
-    db.hostel.groupBy({
-      by: ["type"],
-      where: hostelScopeWhere(session),
-      _count: { _all: true },
-    }),
-    db.booking.count({ where: { ...bookingWhere, status: "CONFIRMED" } }),
-    db.payment.count({ where: { ...paymentWhere, status: "PENDING" } }),
+      ? db.$queryRaw<ManagerOverviewStats[]>`
+          SELECT
+            (SELECT count(DISTINCT b."userId")::int
+               FROM "Booking" b
+               JOIN "Room" r ON r.id = b."roomId"
+              WHERE r."hostelId" = ${hostelId}) AS students,
+            (SELECT count(*)::int FROM "Room" WHERE "hostelId" = ${hostelId}) AS rooms,
+            (SELECT count(*)::int
+               FROM "Booking" b
+               JOIN "Room" r ON r.id = b."roomId"
+              WHERE r."hostelId" = ${hostelId} AND b.status = 'CONFIRMED') AS "activeBookings",
+            (SELECT count(*)::int
+               FROM "Booking" b
+               JOIN "Room" r ON r.id = b."roomId"
+              WHERE r."hostelId" = ${hostelId} AND b.status = 'PENDING') AS "pendingBookings",
+            (SELECT count(*)::int
+               FROM "Payment" p
+               JOIN "Booking" b ON b.id = p."bookingId"
+               JOIN "Room" r ON r.id = b."roomId"
+              WHERE r."hostelId" = ${hostelId} AND p.status = 'PENDING') AS "pendingPayments"
+        `.then((rows) => rows[0]!)
+      : db.$queryRaw<AdminOverviewStats[]>`
+          SELECT
+            (SELECT count(*)::int FROM "User" WHERE role = 'STUDENT') AS students,
+            (SELECT count(*)::int FROM "Hostel" WHERE type = 'UNIVERSITY') AS campus,
+            (SELECT count(*)::int FROM "Hostel" WHERE type = 'PRIVATE') AS priv,
+            (SELECT count(*)::int FROM "Booking" WHERE status = 'CONFIRMED') AS "activeBookings",
+            (SELECT count(*)::int FROM "Booking" WHERE status = 'PENDING') AS "pendingBookings",
+            (SELECT count(*)::int FROM "Payment" WHERE status = 'PENDING') AS "pendingPayments",
+            (SELECT count(*)::int FROM "User") AS users,
+            (SELECT count(*)::int FROM "Hostel") AS hostels,
+            (SELECT count(*)::int FROM "Room") AS rooms,
+            (SELECT count(*)::int FROM "Booking") AS bookings,
+            (SELECT count(*)::int FROM "Payment") AS payments,
+            (SELECT count(*)::int FROM "ActivityLog") AS "activityLog",
+            (SELECT count(*)::int FROM "Notification") AS notifications
+        `.then((rows) => rows[0]!),
+    isManager && session.hostelId
+      ? db.hostel.findUnique({
+          where: { id: session.hostelId },
+          select: {
+            name: true,
+            location: true,
+            isApproved: true,
+          },
+        })
+      : Promise.resolve(null),
     db.booking.findMany({
       where: bookingWhere,
       include: {
@@ -78,36 +130,7 @@ export default async function AdminOverviewPage() {
       take: 8,
     }),
     isManager
-      ? null
-      : Promise.all([
-          db.user.count(),
-          db.hostel.count(),
-          db.room.count(),
-          db.booking.count(),
-          db.payment.count(),
-          db.activityLog.count(),
-          db.notification.count(),
-        ]).then(
-          ([
-            users,
-            hostels,
-            rooms,
-            bookings,
-            payments,
-            activityLog,
-            notifications,
-          ]) => ({
-            users,
-            hostels,
-            rooms,
-            bookings,
-            payments,
-            activityLog,
-            notifications,
-          }),
-        ),
-    isManager
-      ? null
+      ? Promise.resolve(null)
       : db.activityLog.findMany({
           include: { user: { select: { name: true } } },
           orderBy: { createdAt: "desc" },
@@ -115,10 +138,23 @@ export default async function AdminOverviewPage() {
         }),
   ]);
 
-  const countOf = (h: (typeof hostelsByType)[number] | undefined) =>
-    (h?._count as { _all: number } | undefined)?. _all ?? 0;
-  const campus = countOf(hostelsByType.find((h) => h.type === "UNIVERSITY"));
-  const priv = countOf(hostelsByType.find((h) => h.type === "PRIVATE"));
+  const students = stats.students;
+  const activeBookings = stats.activeBookings;
+  const pendingBookings = stats.pendingBookings;
+  const pendingPayments = stats.pendingPayments;
+  const campus = isManager ? 0 : (stats as AdminOverviewStats).campus;
+  const priv = isManager ? 0 : (stats as AdminOverviewStats).priv;
+  const exportCounts = isManager
+    ? null
+    : {
+        users: (stats as AdminOverviewStats).users,
+        hostels: (stats as AdminOverviewStats).hostels,
+        rooms: (stats as AdminOverviewStats).rooms,
+        bookings: (stats as AdminOverviewStats).bookings,
+        payments: (stats as AdminOverviewStats).payments,
+        activityLog: (stats as AdminOverviewStats).activityLog,
+        notifications: (stats as AdminOverviewStats).notifications,
+      };
 
   const cards = [
     {
@@ -128,19 +164,27 @@ export default async function AdminOverviewPage() {
       chip: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
     },
     {
-      label: "Hostels listed",
-      value: `${campus} campus · ${priv} private`,
+      label: isManager ? "Rooms in your hostel" : "Hostels listed",
+      value: isManager
+        ? (stats as ManagerOverviewStats).rooms
+        : `${campus} campus · ${priv} private`,
       icon: Building2,
       chip: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
     },
     {
-      label: "Active room bookings",
+      label: "Confirmed bookings",
       value: activeBookings,
       icon: BedDouble,
       chip: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
     },
     {
-      label: "Payments pending verification",
+      label: "Pending requests",
+      value: pendingBookings,
+      icon: CalendarCheck2,
+      chip: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+    },
+    {
+      label: "Payments to verify",
       value: pendingPayments,
       icon: Wallet,
       chip: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
@@ -152,17 +196,44 @@ export default async function AdminOverviewPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            {isManager ? "Hostel overview" : "Overview"}
+            {isManager ? "Manager dashboard" : "Admin dashboard"}
           </h1>
           <p className="text-sm text-muted-foreground">
             {isManager
-              ? "Scoped to your hostel only."
+              ? managedHostel
+                ? `${managedHostel.name} · ${managedHostel.location}${managedHostel.isApproved ? "" : " · unpublished"}`
+                : "Scoped to your hostel only. No hostel assigned yet."
               : "Institution-wide occupancy, bookings and payments."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {isManager && (
+            <>
+              <Link
+                href={staffPath(session.role, "/hostels")}
+                className="inline-flex h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm hover:bg-muted"
+              >
+                <Building2 className="size-4" />
+                Hostel & rooms
+              </Link>
+              <Link
+                href={staffPath(session.role, "/bookings")}
+                className="inline-flex h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm hover:bg-muted"
+              >
+                <CalendarCheck2 className="size-4" />
+                Bookings
+              </Link>
+              <Link
+                href={staffPath(session.role, "/payments")}
+                className="inline-flex h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm hover:bg-muted"
+              >
+                <Wallet className="size-4" />
+                Payments
+              </Link>
+            </>
+          )}
           <Link
-            href="/admin/analytics"
+            href={staffPath(session.role, "/analytics")}
             className="inline-flex h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm hover:bg-muted"
           >
             <LineChart className="size-4" />
@@ -189,14 +260,14 @@ export default async function AdminOverviewPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 xl:grid-cols-5">
         {cards.map((card) => (
           <Card
             key={card.label}
             className="overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
           >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-medium leading-snug text-muted-foreground sm:text-sm">
                 {card.label}
               </CardTitle>
               <span
@@ -207,7 +278,7 @@ export default async function AdminOverviewPage() {
               </span>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold tracking-tight">
+              <div className="text-xl font-bold tracking-tight break-words sm:text-2xl">
                 {card.value}
               </div>
             </CardContent>
@@ -217,7 +288,7 @@ export default async function AdminOverviewPage() {
 
       {!isManager && exportCounts && (
         <Card className="border-dashed">
-          <CardHeader className="flex-row items-center justify-between gap-4 space-y-0">
+          <CardHeader className="flex-col items-start justify-between gap-4 space-y-0 sm:flex-row sm:items-center">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <DatabaseBackup className="size-4 text-muted-foreground" />
@@ -242,7 +313,7 @@ export default async function AdminOverviewPage() {
               <CardDescription>Latest entries from the append-only activity log</CardDescription>
             </div>
             <Link
-              href="/admin/activity"
+              href={staffPath(session.role, "/activity")}
               className="text-xs text-primary underline-offset-4 hover:underline"
             >
               View all →
@@ -287,13 +358,38 @@ export default async function AdminOverviewPage() {
             </CardDescription>
           </div>
           <Link
-            href="/admin/bookings"
+            href={staffPath(session.role, "/bookings")}
             className="text-xs text-primary underline-offset-4 hover:underline"
           >
             Manage bookings →
           </Link>
         </CardHeader>
         <CardContent>
+          <div className="space-y-3 lg:hidden">
+            {recentBookings.length === 0 && (
+              <p className="py-4 text-center text-sm text-muted-foreground">
+                No booking requests yet.
+              </p>
+            )}
+            {recentBookings.map((booking) => (
+              <MobileRecord key={booking.id}>
+                <MobileField label="Student">
+                  <p className="font-medium">{booking.user.name}</p>
+                </MobileField>
+                <MobileField label="Hostel">{booking.room.hostel.name}</MobileField>
+                <MobileField label="Room">{booking.room.roomNumber}</MobileField>
+                <MobileField label="Amount">
+                  <span className="font-medium">
+                    GH₵ {booking.amount.toLocaleString()}
+                  </span>
+                </MobileField>
+                <MobileField label="Status">
+                  <StatusBadge status={booking.status} />
+                </MobileField>
+              </MobileRecord>
+            ))}
+          </div>
+          <div className="hidden min-w-0 overflow-x-auto lg:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -329,6 +425,7 @@ export default async function AdminOverviewPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

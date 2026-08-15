@@ -7,7 +7,7 @@ import {
   homeForRole,
   verifyCredentials,
 } from "@/lib/auth";
-import { audit } from "@/lib/audit";
+import { audit, auditAfter } from "@/lib/audit";
 import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
 import {
   buildResetUrl,
@@ -15,6 +15,7 @@ import {
   hashResetToken,
   isTokenExpired,
   RESET_TOKEN_TTL_MS,
+  resetLinkOrigin,
 } from "@/lib/password-reset";
 import { sendPasswordReset, showResetLinkInResponse } from "@/lib/mailer";
 import {
@@ -72,12 +73,15 @@ export async function loginUser(input: { email: unknown; password: unknown }, ip
     throw validationError(parsed.error.issues[0]?.message ?? "Invalid input");
   }
 
-  // Serverless cold starts may boot an empty /tmp DB - plant demo accounts.
-  const { ensureDemoData } = await import("@/lib/ensure-demo-data");
-  try {
-    await ensureDemoData();
-  } catch (error) {
-    console.error("[login] ensureDemoData failed:", error);
+  // Optional empty-DB seed (legacy /tmp SQLite). Off by default on Neon —
+  // data comes from `bun run db:seed`. Set HBMS_ENSURE_DEMO=1 to re-enable.
+  if (process.env.HBMS_ENSURE_DEMO === "1") {
+    const { ensureDemoData } = await import("@/lib/ensure-demo-data");
+    try {
+      await ensureDemoData();
+    } catch (error) {
+      console.error("[login] ensureDemoData failed:", error);
+    }
   }
 
   const email = parsed.data.email.trim().toLowerCase();
@@ -85,20 +89,29 @@ export async function loginUser(input: { email: unknown; password: unknown }, ip
   // Throttle per email+IP: 5 failed attempts per minute (SECURITY.md §3).
   const key = `login:${email}|${ip}`;
   if (!checkRateLimit(key)) {
-    await audit({ action: "auth.rate_limited", subjectType: "User", ipAddress: ip });
+    auditAfter({
+      action: "auth.rate_limited",
+      subjectType: "User",
+      ipAddress: ip,
+    });
     throw rateLimitedError("Too many login attempts. Please wait a minute and try again.");
   }
 
   const user = await verifyCredentials(email, parsed.data.password);
   if (!user) {
-    await audit({ action: "auth.login_failed", subjectType: "User", ipAddress: ip });
+    auditAfter({
+      action: "auth.login_failed",
+      subjectType: "User",
+      ipAddress: ip,
+    });
     throw unauthenticatedError("Invalid email or password");
   }
 
   // Only failed attempts consume the budget - success resets the window.
   resetRateLimit(key);
-  await audit({ action: "auth.login", userId: user.id, ipAddress: ip });
+  // Cookie only on the critical path; audit runs after the response (after()).
   await createSession({ id: user.id, role: user.role, hostelId: user.hostelId });
+  auditAfter({ action: "auth.login", userId: user.id, ipAddress: ip });
   return { user: toPublicUser(user), home: homeForRole(user.role) };
 }
 
@@ -141,10 +154,13 @@ export async function registerUser(input: {
 
 export async function logoutUser() {
   const session = await getSession();
-  if (session?.userId) {
-    await audit({ action: "auth.logout", userId: session.userId });
-  }
+  const userId = session?.userId;
+  // Cookie-only critical path. `void audit()` still held the Server Action
+  // open until Neon finished (~4–5s cold); after() runs post-response.
   await destroySession();
+  if (userId) {
+    auditAfter({ action: "auth.logout", userId });
+  }
 }
 
 /** The session's own record (DB-validated), for GET /api/auth/me. */
@@ -324,7 +340,7 @@ export async function requestPasswordReset(
       },
     });
 
-    const resetUrl = buildResetUrl(origin, token);
+    const resetUrl = buildResetUrl(resetLinkOrigin(origin), token);
     await sendPasswordReset(user.email, resetUrl);
     if (showResetLinkInResponse()) devResetUrl = resetUrl;
 

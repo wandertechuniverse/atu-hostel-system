@@ -1,5 +1,6 @@
 import "server-only";
 
+import { after } from "next/server";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
 
@@ -17,19 +18,21 @@ async function requestIp() {
   }
 }
 
+export type AuditOpts = {
+  action: string;
+  userId?: string | null;
+  subjectType?: string | null;
+  subjectId?: string | null;
+  ipAddress?: string | null;
+};
+
 /**
  * Audit trail (ActivityLog): records that an action occurred and by whom.
  * Append-only - the application exposes no delete path (SECURITY.md §6).
  * Kept separate from lib/scoping.ts so the pure RLS helpers stay importable
  * in unit tests without a database.
  */
-export async function audit(opts: {
-  action: string;
-  userId?: string | null;
-  subjectType?: string | null;
-  subjectId?: string | null;
-  ipAddress?: string | null;
-}) {
+export async function audit(opts: AuditOpts) {
   // Every entry records where it happened when the caller doesn't supply one.
   const ip = opts.ipAddress ?? (await requestIp());
   try {
@@ -64,4 +67,15 @@ export async function audit(opts: {
     }
     console.error(`[audit] failed to write activity log for "${opts.action}":`, error);
   }
+}
+
+/**
+ * Schedule an audit write after the HTTP response is sent.
+ * Use for login/logout so a cold Neon RTT cannot pad the action timer
+ * (`void audit()` still keeps the Server Action alive until the write ends).
+ */
+export function auditAfter(opts: AuditOpts): void {
+  after(() => {
+    void audit(opts);
+  });
 }

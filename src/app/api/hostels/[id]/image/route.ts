@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * POST /api/hostels/:id/image - replace the hostel photo with a multipart
- * upload (field "file"; JPEG/PNG/WebP, max 5 MB). Manager: own hostel;
+ * upload (field "file"; JPEG, PNG or WebP, max 10 MB). Manager: own hostel;
  * admin: any. Same service the admin form uses.
  */
 export async function POST(

@@ -59,7 +59,10 @@ export function NotificationBell({
           )}
         </span>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 min-w-80 p-0">
+      <DropdownMenuContent
+        align="end"
+        className="w-[min(20rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] p-0"
+      >
         <div className="flex items-center justify-between gap-2 px-3 py-2">
           <p className="text-sm font-semibold text-foreground">Notifications</p>
           {unreadCount > 0 && (

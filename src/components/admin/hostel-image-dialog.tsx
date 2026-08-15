@@ -26,7 +26,7 @@ const initial: UploadImageState = {};
 const initialRemove: HostelFormState = {};
 
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
-const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_BYTES = 10 * 1024 * 1024;
 
 export function HostelImageDialog({
   hostelId,
@@ -62,7 +62,7 @@ export function HostelImageDialog({
       return;
     }
     if (file.size > MAX_BYTES) {
-      setClientError("Image must be 5 MB or smaller.");
+      setClientError("Image must be 10 MB or smaller.");
       setPreview(null);
       return;
     }
@@ -95,7 +95,7 @@ export function HostelImageDialog({
         <ImagePlus className="size-3.5" />
         Photo
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Hostel photo</DialogTitle>
           <DialogDescription>
@@ -152,7 +152,7 @@ export function HostelImageDialog({
           )}
           <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed px-3 py-4 text-sm text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground">
             <ImagePlus className="size-4" />
-            Choose an image (JPEG, PNG or WebP, max 5 MB)
+            Choose an image (JPEG, PNG or WebP, max 10 MB)
             <input
               type="file"
               name="file"

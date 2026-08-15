@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { CsrfInput } from "@/components/csrf-input";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   toggleHostelApprovalFormAction,
@@ -21,6 +22,18 @@ export function HostelApprovalButton({
     toggleHostelApprovalFormAction,
     initial,
   );
+  const seen = useRef(false);
+  useEffect(() => {
+    if (!seen.current) {
+      seen.current = true;
+      return;
+    }
+    if (state.ok) {
+      toast.success(isApproved ? "Hostel unpublished" : "Hostel published");
+    } else if (state.error) {
+      toast.error(state.error);
+    }
+  }, [state, isApproved]);
 
   return (
     <form action={formAction} className="flex flex-col items-end gap-1">

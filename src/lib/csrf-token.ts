@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
 import { CSRF_COOKIE, CSRF_FIELD } from "@/lib/csrf-constants";
+import { resolveSessionSecret } from "@/lib/session";
 
 export { CSRF_COOKIE, CSRF_FIELD };
 
@@ -11,7 +12,7 @@ function secretBytes(secret: string) {
 
 /** Pure: mint a signed CSRF JWT (testable without cookies / Next runtime). */
 export async function signCsrfToken(
-  secret = process.env.SESSION_SECRET ?? "dev-only-secret-change-me",
+  secret = resolveSessionSecret(),
   jti = crypto.randomUUID(),
 ): Promise<string> {
   return new SignJWT({ purpose: "csrf" })
@@ -25,7 +26,7 @@ export async function signCsrfToken(
 /** Pure: verify signature + purpose claim. Returns false on any failure. */
 export async function verifyCsrfToken(
   token: string,
-  secret = process.env.SESSION_SECRET ?? "dev-only-secret-change-me",
+  secret = resolveSessionSecret(),
 ): Promise<boolean> {
   if (!token || token.length > 2048) return false;
   try {

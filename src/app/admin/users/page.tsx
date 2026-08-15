@@ -21,6 +21,11 @@ import { ManagerAssignmentForm } from "@/components/admin/manager-assignment-for
 import { EditUserDialog } from "@/components/admin/edit-user-dialog";
 import { CreateUserDialog } from "@/components/admin/create-user-dialog";
 import { DeleteUserDialog } from "@/components/admin/delete-user-dialog";
+import {
+  MobileField,
+  MobileFieldRow,
+  MobileRecord,
+} from "@/components/mobile-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -42,26 +47,46 @@ export default async function AdminUsersPage() {
   const session = await requireRole("ADMIN");
 
   // Administrators only: view all users (A4), activate/deactivate (A6),
-  // assign hostel managers (A2).
+  // assign hostel managers (A2). Manager occupancy is derived from users
+  // (User.hostelId is unique) so hostels need no manager join.
   const [users, hostels] = await Promise.all([
     db.user.findMany({
-      include: {
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        studentIdNumber: true,
+        department: true,
+        role: true,
+        isActive: true,
+        updatedAt: true,
         hostel: { select: { id: true, name: true } },
         _count: { select: { bookings: true } },
       },
       orderBy: { createdAt: "asc" },
     }),
     db.hostel.findMany({
-      include: { manager: { select: { id: true } } },
+      select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
   ]);
 
-  const takenBy = new Map(hostels.map((h) => [h.id, h.manager?.id ?? null]));
+  const takenBy = new Map(
+    users
+      .filter((u) => u.hostel)
+      .map((u) => [u.hostel!.id, u.id] as const),
+  );
+
+  const hostelOptions = hostels.map((h) => ({
+    id: h.id,
+    name: h.name,
+    takenBy: takenBy.get(h.id) ?? null,
+  }));
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Users</h1>
           <p className="text-sm text-muted-foreground">
@@ -80,6 +105,83 @@ export default async function AdminUsersPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="space-y-3 lg:hidden">
+            {users.map((user) => {
+              const isSelf = user.id === session.userId;
+              return (
+                <MobileRecord
+                  key={user.id}
+                  className={user.isActive ? "" : "opacity-60"}
+                >
+                  <MobileField label="Student">
+                    <p className="font-medium">
+                      {user.name}
+                      {isSelf ? (
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">
+                          (you)
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="text-xs text-muted-foreground break-all">
+                      {user.email}
+                    </p>
+                  </MobileField>
+                  <MobileField label="Student ID">
+                    {user.studentIdNumber ?? "-"}
+                  </MobileField>
+                  <MobileFieldRow>
+                    <MobileField label="Role">
+                      <Badge variant={roleVariant[user.role] ?? "secondary"}>
+                        {user.role}
+                      </Badge>
+                    </MobileField>
+                    <MobileField label="Status">
+                      {user.isActive ? (
+                        <Badge variant="default">Active</Badge>
+                      ) : (
+                        <Badge variant="outline">Inactive</Badge>
+                      )}
+                    </MobileField>
+                  </MobileFieldRow>
+                  <MobileField label="Hostel">
+                    {user.hostel?.name ?? "None"}
+                  </MobileField>
+                  <div className="flex flex-col gap-1.5">
+                    <EditUserDialog
+                      key={`m-${user.id}:${safeDateKey(user.updatedAt)}`}
+                      user={{
+                        id: user.id,
+                        name: user.name,
+                        email: user.email,
+                        phone: user.phone,
+                        studentIdNumber: user.studentIdNumber,
+                        department: user.department,
+                      }}
+                    />
+                    <ManagerAssignmentForm
+                      key={`m-${user.id}:${user.hostel?.id ?? "none"}`}
+                      userId={user.id}
+                      currentHostelId={user.hostel?.id ?? null}
+                      hostels={hostelOptions}
+                    />
+                    <ToggleUserStatusButton
+                      key={`m-${user.id}:${user.isActive}`}
+                      userId={user.id}
+                      isActive={user.isActive}
+                      isSelf={isSelf}
+                    />
+                    <DeleteUserDialog
+                      userId={user.id}
+                      name={user.name}
+                      bookingCount={user._count.bookings}
+                      isSelf={isSelf}
+                    />
+                  </div>
+                </MobileRecord>
+              );
+            })}
+          </div>
+          <div className="hidden min-w-0 overflow-x-auto lg:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -152,11 +254,7 @@ export default async function AdminUsersPage() {
                           key={`${user.id}:${user.hostel?.id ?? "none"}`}
                           userId={user.id}
                           currentHostelId={user.hostel?.id ?? null}
-                          hostels={hostels.map((h) => ({
-                            id: h.id,
-                            name: h.name,
-                            takenBy: takenBy.get(h.id) ?? null,
-                          }))}
+                          hostels={hostelOptions}
                         />
                         {/* Keyed on status so the Activate/Deactivate label
                             reflects the saved state after revalidation. */}
@@ -179,6 +277,7 @@ export default async function AdminUsersPage() {
               })}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

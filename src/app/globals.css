@@ -202,6 +202,25 @@
   }
 }
 
+@keyframes auth-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.auth-enter {
+  animation: auth-enter 0.18s ease-out both;
+}
+
+.auth-enter-delay {
+  animation-delay: 40ms;
+}
+
 /* Accessibility: honour users who ask for reduced motion (WCAG 2.3.3). */
 @media (prefers-reduced-motion: reduce) {
   *,

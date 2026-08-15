@@ -41,21 +41,29 @@ export async function loginAction(
   _prev: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  // redirect() throws NEXT_REDIRECT — keep it outside try/catch so the
+  // navigation is not converted into a form error (or a client NetworkError).
+  let home: string;
   try {
     await requireCsrf(formData);
-    const { home } = await loginUser(
+    ({ home } = await loginUser(
       { email: formData.get("email"), password: formData.get("password") },
       await clientIp(),
-    );
-    redirect(home);
+    ));
   } catch (error) {
     return { error: errorMessage(error) };
   }
+  redirect(home);
 }
 
-export async function logoutAction(formData: FormData) {
-  await requireCsrf(formData);
-  await logoutUser();
+export async function logoutAction(_formData: FormData) {
+  // Logout is a SameSite=lax POST. A missing CSRF token must not crash the
+  // app (the hamburger sheet often submits before the hidden field is filled).
+  try {
+    await logoutUser();
+  } catch {
+    // Session may already be gone.
+  }
   redirect("/login");
 }
 

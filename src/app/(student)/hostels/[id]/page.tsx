@@ -17,6 +17,7 @@ import {
 import { BookingDialog } from "@/components/student/booking-dialog";
 import { FacilityBadges } from "@/components/student/facility-badges";
 import { availableBeds } from "@/lib/availability";
+import { MobileField, MobileRecord } from "@/components/mobile-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -140,6 +141,54 @@ export default async function HostelDetailPage({ params }: PageProps<"/hostels/[
         )}
 
         <h2 className="mb-3 text-xl font-semibold">Rooms</h2>
+        <div className="space-y-3 lg:hidden">
+          {rooms.map((room) => (
+            <MobileRecord key={room.id} className="overflow-hidden p-0">
+              {room.featuredImage && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={room.featuredImage}
+                  alt={`Room ${room.roomNumber}`}
+                  className="h-36 w-full object-cover"
+                />
+              )}
+              <div className="space-y-2.5 p-3">
+                <MobileField label="Room">
+                  <p className="font-medium">
+                    {room.roomNumber} · {room.roomType}
+                  </p>
+                </MobileField>
+                <MobileField label="Capacity">{room.capacity} beds</MobileField>
+                <MobileField label="Price / year">
+                  <span className="font-medium">
+                    GH₵ {room.pricePerSemester.toLocaleString()}
+                  </span>
+                </MobileField>
+                <MobileField label="Available">
+                  {room.status === "AVAILABLE" ? (
+                    room.available > 0 ? (
+                      <span className="text-emerald-600 dark:text-emerald-400">
+                        {room.available} of {room.capacity} open
+                      </span>
+                    ) : (
+                      <span className="text-destructive">Full</span>
+                    )
+                  ) : (
+                    <span className="text-muted-foreground">Unavailable</span>
+                  )}
+                </MobileField>
+                {room.status === "AVAILABLE" && room.available > 0 && (
+                  <BookingDialog
+                    room={room}
+                    requiresLogin={!loggedInStudent}
+                    hostelName={hostel.name}
+                  />
+                )}
+              </div>
+            </MobileRecord>
+          ))}
+        </div>
+        <div className="hidden min-w-0 overflow-x-auto lg:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -154,7 +203,19 @@ export default async function HostelDetailPage({ params }: PageProps<"/hostels/[
           <TableBody>
             {rooms.map((room) => (
               <TableRow key={room.id}>
-                <TableCell className="font-medium">{room.roomNumber}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-3">
+                    {room.featuredImage && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={room.featuredImage}
+                        alt=""
+                        className="size-12 shrink-0 rounded-md object-cover"
+                      />
+                    )}
+                    {room.roomNumber}
+                  </div>
+                </TableCell>
                 <TableCell>{room.roomType}</TableCell>
                 <TableCell>{room.capacity} beds</TableCell>
                 <TableCell className="text-right">
@@ -186,6 +247,7 @@ export default async function HostelDetailPage({ params }: PageProps<"/hostels/[
             ))}
           </TableBody>
         </Table>
+        </div>
     </main>
   );
 }

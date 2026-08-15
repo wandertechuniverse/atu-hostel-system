@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { CsrfInput } from "@/components/csrf-input";
 import Link from "next/link";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,7 +23,7 @@ export function RegisterForm() {
       <CsrfInput />
       <div className="space-y-1.5">
         <Label htmlFor="name">Full name</Label>
-        <Input id="name" name="name" autoComplete="name" required />
+        <Input id="name" name="name" autoComplete="name" autoFocus required />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="email">Email</Label>
@@ -53,11 +54,15 @@ export function RegisterForm() {
         <p className="text-xs text-muted-foreground">At least 8 characters.</p>
       </div>
       {state.error && (
-        <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <p
+          role="alert"
+          className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
           {state.error}
         </p>
       )}
       <Button type="submit" className="w-full" disabled={pending}>
+        {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
         {pending ? "Creating account…" : "Create account"}
       </Button>
       <p className="text-center text-sm text-muted-foreground">

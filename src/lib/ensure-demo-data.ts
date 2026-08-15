@@ -2,6 +2,7 @@ import "server-only";
 
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
+import { DEMO_PASSWORD } from "@/lib/demo-accounts";
 
 /**
  * On serverless (Netlify) each cold instance may start with an empty /tmp
@@ -13,6 +14,7 @@ import { db } from "@/lib/db";
 let ensurePromise: Promise<void> | null = null;
 
 export async function ensureDemoData(): Promise<void> {
+  if (process.env.NODE_ENV === "production") return;
   if (!ensurePromise) {
     ensurePromise = ensureDemoDataOnce().catch((error) => {
       // Allow a later request to retry after a transient failure.
@@ -38,10 +40,10 @@ async function ensureDemoDataOnce(): Promise<void> {
   if (count > 0) return;
 
   console.warn(
-    "[ensure-demo-data] empty database - seeding demo accounts (password: password)",
+    `[ensure-demo-data] empty database - seeding demo accounts (password: ${DEMO_PASSWORD})`,
   );
 
-  const password = await bcrypt.hash("password", 12);
+  const password = await bcrypt.hash(DEMO_PASSWORD, 12);
 
   // Minimal account set so staff/student login works even without the full
   // hostel seed. Full seed is preferred via prepare-demo-db at build time.

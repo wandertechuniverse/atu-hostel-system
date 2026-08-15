@@ -31,6 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { MobileField, MobileRecord } from "@/components/mobile-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -213,6 +214,24 @@ export default async function AdminNotificationsPage() {
               </dd>
             </div>
           </dl>
+          <div className="space-y-3 lg:hidden">
+            {mailtrap.templates.map((row) => (
+              <MobileRecord key={row.event}>
+                <MobileField label="Event">
+                  <span className="break-all font-mono text-xs">{row.event}</span>
+                </MobileField>
+                <MobileField label="Env key">
+                  <span className="break-all font-mono text-xs">{row.envKey}</span>
+                </MobileField>
+                <MobileField label="Template UUID">
+                  <span className="break-all font-mono text-xs">
+                    {row.uuid ?? "not bound"}
+                  </span>
+                </MobileField>
+              </MobileRecord>
+            ))}
+          </div>
+          <div className="hidden min-w-0 overflow-x-auto lg:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -241,6 +260,7 @@ export default async function AdminNotificationsPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -256,6 +276,23 @@ export default async function AdminNotificationsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="space-y-3 lg:hidden">
+            {NOTIFICATION_EVENTS.map((event) => (
+              <MobileRecord key={event.id}>
+                <MobileField label="Event">
+                  <p className="font-medium">{event.label}</p>
+                  <p className="font-mono text-[11px] text-muted-foreground">
+                    {event.id}
+                  </p>
+                </MobileField>
+                <MobileField label="Audience">
+                  <Badge variant="outline">{event.audience}</Badge>
+                </MobileField>
+                <MobileField label="When it fires">{event.trigger}</MobileField>
+              </MobileRecord>
+            ))}
+          </div>
+          <div className="hidden min-w-0 overflow-x-auto lg:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -283,6 +320,7 @@ export default async function AdminNotificationsPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -295,6 +333,35 @@ export default async function AdminNotificationsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="space-y-3 lg:hidden">
+            {deliveries.length === 0 && (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                No notifications have been recorded yet. Approve a booking or
+                send a test email to see a row here.
+              </p>
+            )}
+            {deliveries.map((row) => (
+              <MobileRecord key={row.id}>
+                <MobileField label="Event">
+                  <p className="font-medium">{row.title}</p>
+                  <p className="text-xs text-muted-foreground">{row.type}</p>
+                </MobileField>
+                <MobileField label="Recipient">
+                  <p className="font-medium">{row.user.name}</p>
+                  <p className="text-xs text-muted-foreground break-all">
+                    {row.emailTo ?? row.user.email}
+                  </p>
+                </MobileField>
+                <MobileField label="Time">{formatTime(row.createdAt)}</MobileField>
+                <MobileField label="Delivery">
+                  <Badge variant={deliveryTone(row.delivery)}>
+                    {row.delivery}
+                  </Badge>
+                </MobileField>
+              </MobileRecord>
+            ))}
+          </div>
+          <div className="hidden min-w-0 overflow-x-auto lg:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -342,6 +409,7 @@ export default async function AdminNotificationsPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

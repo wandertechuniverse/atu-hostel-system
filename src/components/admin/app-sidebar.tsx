@@ -24,31 +24,31 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { getSession } from "@/lib/auth";
 import { logoutAction } from "@/lib/actions/auth";
 import { CsrfInput } from "@/components/csrf-input";
+import { staffPath } from "@/lib/paths";
+import type { SessionData } from "@/lib/session";
 
 const nav = [
-  { href: "/admin", label: "Overview", icon: LayoutDashboard, adminOnly: false },
-  { href: "/admin/analytics", label: "Analytics", icon: LineChart, adminOnly: false },
-  { href: "/admin/hostels", label: "Hostels", icon: Building2, adminOnly: false },
-  { href: "/admin/bookings", label: "Bookings", icon: CalendarCheck2, adminOnly: false },
-  { href: "/admin/payments", label: "Payments", icon: Wallet, adminOnly: false },
-  { href: "/admin/reports", label: "Reports", icon: BarChart3, adminOnly: false },
-  { href: "/admin/users", label: "Users", icon: Users, adminOnly: true },
-  { href: "/admin/notifications", label: "Notifications", icon: Bell, adminOnly: true },
-  { href: "/admin/activity", label: "Audit log", icon: ScrollText, adminOnly: true },
+  { href: "", label: "Overview", icon: LayoutDashboard, adminOnly: false },
+  { href: "/analytics", label: "Analytics", icon: LineChart, adminOnly: false },
+  { href: "/hostels", label: "Hostels", icon: Building2, adminOnly: false },
+  { href: "/bookings", label: "Bookings", icon: CalendarCheck2, adminOnly: false },
+  { href: "/payments", label: "Payments", icon: Wallet, adminOnly: false },
+  { href: "/reports", label: "Reports", icon: BarChart3, adminOnly: false },
+  { href: "/users", label: "Users", icon: Users, adminOnly: true },
+  { href: "/notifications", label: "Notifications", icon: Bell, adminOnly: true },
+  { href: "/activity", label: "Audit log", icon: ScrollText, adminOnly: true },
 ];
 
-export async function AppSidebar() {
-  const session = await getSession();
-
+/** Sync sidebar — role comes from StaffShell (already DB-validated). */
+export function AppSidebar({ role }: { role: SessionData["role"] }) {
   return (
     <Sidebar>
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-1 font-semibold">
           <Building2 className="size-5" />
-          HBMS Admin
+          {role === "ADMIN" ? "HBMS Admin" : "HBMS Manager"}
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -56,10 +56,12 @@ export async function AppSidebar() {
           <SidebarGroupLabel>Management</SidebarGroupLabel>
           <SidebarMenu>
             {nav
-              .filter((item) => !item.adminOnly || session.role === "ADMIN")
+              .filter((item) => !item.adminOnly || role === "ADMIN")
               .map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton render={<Link href={item.href} />}>
+                <SidebarMenuItem key={item.href || "overview"}>
+                  <SidebarMenuButton
+                    render={<Link href={staffPath(role, item.href)} />}
+                  >
                     <item.icon />
                     <span>{item.label}</span>
                   </SidebarMenuButton>
@@ -71,7 +73,7 @@ export async function AppSidebar() {
       <SidebarFooter>
         <div className="px-2 pb-2">
           <p className="truncate text-xs font-medium">
-            {session.role === "ADMIN" ? "Administrator" : "Hostel Manager"}
+            {role === "ADMIN" ? "Administrator" : "Hostel Manager"}
           </p>
           <Link
             href="/change-password"
@@ -81,7 +83,7 @@ export async function AppSidebar() {
             Change password
           </Link>
           <form action={logoutAction} className="mt-2">
-      <CsrfInput />
+            <CsrfInput />
             <button
               type="submit"
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"

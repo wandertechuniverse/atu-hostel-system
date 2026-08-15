@@ -55,7 +55,7 @@ for (const { name, width, height } of WIDTHS) {
   }) => {
     await page.setViewportSize({ width, height });
     await login(page, "student@atu.edu.gh");
-    await page.goto("/my-bookings");
+    await page.goto("/student/bookings");
     await expectNoHorizontalOverflow(page);
   });
 }

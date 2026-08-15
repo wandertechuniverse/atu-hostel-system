@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { requireRole, requireSession } from "@/lib/auth";
+import { homeForRole } from "@/lib/paths";
 import { requireCsrf } from "@/lib/csrf";
 import { errorMessage } from "@/lib/services/errors";
 import {
@@ -34,6 +35,7 @@ async function guardCsrf(
 function refreshNotificationViews() {
   revalidatePath("/admin/notifications");
   revalidatePath("/admin");
+  revalidatePath("/manager");
   revalidatePath("/");
 }
 
@@ -85,12 +87,19 @@ export async function openNotificationAction(formData: FormData) {
     String(formData.get("id") ?? ""),
   );
   refreshNotificationViews();
-  redirect(href || (session.role === "STUDENT" ? "/" : "/admin"));
+  redirect(href || homeForRole(session.role));
 }
 
 export async function markAllReadAction(formData: FormData) {
-  await requireCsrf(formData);
-  const session = await requireSession();
-  await markAllNotificationsRead(session.userId!);
-  refreshNotificationViews();
+  try {
+    await requireCsrf(formData);
+    const session = await requireSession();
+    await markAllNotificationsRead(session.userId!);
+    refreshNotificationViews();
+  } catch (error) {
+    // requireSession uses redirect() on auth/DB failure (throws NEXT_REDIRECT).
+    unstable_rethrow(error);
+    // Soft-fail the bell action so a Neon blip never 500s the whole page.
+    console.error("[notifications] markAllReadAction failed:", error);
+  }
 }

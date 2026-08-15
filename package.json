@@ -13,7 +13,10 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "db:setup": "prisma db push && prisma db seed",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:local": "prisma dev --name hbms-local --detach",
+    "db:local:stop": "prisma dev stop hbms-local",
+    "db:local:setup": "prisma dev --name hbms-local --detach && prisma db push && prisma db seed"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -37,6 +40,7 @@
     "react-dom": "19.2.8",
     "react-leaflet": "^5.0.0",
     "recharts": "^3.10.1",
+    "server-only": "^0.0.1",
     "shadcn": "^4.16.2",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.6.0",

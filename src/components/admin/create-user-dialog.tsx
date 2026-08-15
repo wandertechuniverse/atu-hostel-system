@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { CsrfInput } from "@/components/csrf-input";
+import { toast } from "sonner";
 import { UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,7 +39,12 @@ export function CreateUserDialog() {
 
   // Close after a successful save (the action revalidates the page).
   useEffect(() => {
-    if (state.ok) setOpen(false);
+    if (state.ok) {
+      toast.success("User created");
+      setOpen(false);
+    } else if (state.error) {
+      toast.error(state.error);
+    }
   }, [state]);
 
   return (

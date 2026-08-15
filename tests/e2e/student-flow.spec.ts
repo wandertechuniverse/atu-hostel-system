@@ -40,7 +40,7 @@ test("student registers, browses hostels, books a room, and sees the request", a
   await dialog.getByRole("button", { name: "Submit request" }).click();
 
   // --- My bookings shows the PENDING request (FR-6) ---
-  await expect(page).toHaveURL(/\/my-bookings/);
+  await expect(page).toHaveURL(/\/student\/bookings/);
   await expect(page.getByText("ATU Main Campus Hostel")).toBeVisible();
   await expect(page.getByText("Pending", { exact: true })).toBeVisible();
 });

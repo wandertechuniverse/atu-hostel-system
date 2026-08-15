@@ -11,14 +11,14 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       />
       <Link
         href="/"
-        className="relative mb-6 flex items-center gap-2 text-lg font-semibold"
+        className="auth-enter relative mb-6 flex items-center gap-2 text-lg font-semibold transition-opacity hover:opacity-80"
       >
         <span className="rounded-lg bg-primary p-1.5 text-primary-foreground">
           <Building2 className="size-5" />
         </span>
         ATU Hostel Booking
       </Link>
-      <Card className="relative w-full max-w-sm shadow-lg">
+      <Card className="auth-enter auth-enter-delay relative w-full max-w-sm shadow-lg">
         <CardContent className="p-6">{children}</CardContent>
       </Card>
     </main>

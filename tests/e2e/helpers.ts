@@ -1,5 +1,6 @@
 import { execSync } from "node:child_process";
 import type { Page } from "@playwright/test";
+import { DEMO_PASSWORD } from "../../src/lib/demo-accounts";
 import { APP_DIR, TEST_DB_URL } from "./constants";
 
 /**
@@ -16,10 +17,10 @@ export function reseed() {
 }
 
 /** Log in and wait for the role-appropriate landing page. */
-export async function login(page: Page, email: string, password = "password") {
+export async function login(page: Page, email: string, password = DEMO_PASSWORD) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Log in", exact: true }).click();
-  await page.waitForURL(/\/admin$|\/$/);
+  await page.waitForURL(/\/admin$|\/manager$|\/$/);
 }

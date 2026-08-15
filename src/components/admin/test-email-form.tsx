@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { toast } from "sonner";
 import { CsrfInput } from "@/components/csrf-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,29 @@ export function TestEmailForm({ defaultTo }: { defaultTo: string }) {
     verifyMailerAction,
     initial,
   );
+
+  useEffect(() => {
+    if (verifyState.verifyMessage) {
+      if (verifyState.ok) toast.success(verifyState.verifyMessage);
+      else toast.error(verifyState.verifyMessage);
+    } else if (verifyState.error) {
+      toast.error(verifyState.error);
+    }
+  }, [verifyState]);
+
+  useEffect(() => {
+    if (sendState.ok) {
+      toast.success(
+        sendState.status === "logged"
+          ? "Test message written to the server log"
+          : sendState.status === "skipped"
+            ? "Outbound email is paused"
+            : "Test email sent",
+      );
+    } else if (sendState.error) {
+      toast.error(sendState.error);
+    }
+  }, [sendState]);
 
   return (
     <div className="space-y-4">

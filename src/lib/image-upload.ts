@@ -14,8 +14,8 @@ export const IMAGE_TYPES: Record<string, string> = {
   "image/webp": "webp",
 };
 
-/** Max upload size: 5 MB (generous for phone photos, small for the demo). */
-export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+/** Max upload size: 10 MB (phone photos of rooms / hostels). */
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
 /** The four canonical seed photos - never deleted by an upload's cleanup pass. */
 export const SEED_IMAGE_FILES = new Set([

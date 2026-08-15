@@ -18,6 +18,11 @@ import {
 } from "@/components/ui/table";
 import { ExportCsvButton } from "@/components/admin/export-csv-button";
 import { StatusBadge } from "@/components/ui/status-badge";
+import {
+  MobileField,
+  MobileFieldRow,
+  MobileRecord,
+} from "@/components/mobile-fields";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -126,7 +131,7 @@ export function ReportsRecords({
         />
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end">
           <label className="space-y-1 text-xs text-muted-foreground">
             <span className="block">Status</span>
             <select
@@ -235,12 +240,51 @@ export function ReportsRecords({
           page {safePage} of {totalPages}
         </p>
 
+        <div className="space-y-3 lg:hidden">
+          {pageRows.length === 0 && (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              No bookings match these filters.
+            </p>
+          )}
+          {pageRows.map((booking) => (
+            <MobileRecord key={booking.id}>
+              <MobileField label="Student">
+                <p className="font-medium">{booking.student}</p>
+                {booking.studentIdNumber ? (
+                  <p className="text-xs text-muted-foreground break-all">
+                    {booking.studentIdNumber}
+                  </p>
+                ) : null}
+              </MobileField>
+              <MobileField label="Hostel">{booking.hostel}</MobileField>
+              <MobileField label="Room">{booking.room}</MobileField>
+              <MobileField label="Session">{booking.session}</MobileField>
+              <MobileField label="Amount">
+                <span className="font-medium">{ghs(booking.amount)}</span>
+              </MobileField>
+              <MobileFieldRow>
+                <MobileField label="Status">
+                  <StatusBadge status={booking.status} />
+                </MobileField>
+                <MobileField label="Payment">
+                  {booking.payment === "UNPAID" ? (
+                    <span className="text-muted-foreground">Unpaid</span>
+                  ) : (
+                    <StatusBadge status={booking.payment} />
+                  )}
+                </MobileField>
+              </MobileFieldRow>
+            </MobileRecord>
+          ))}
+        </div>
+        <div className="hidden min-w-0 overflow-x-auto lg:block">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Student</TableHead>
               <TableHead>Hostel</TableHead>
               <TableHead>Room</TableHead>
+              <TableHead>Session</TableHead>
               <TableHead className="text-right">Amount</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Payment</TableHead>
@@ -249,7 +293,7 @@ export function ReportsRecords({
           <TableBody>
             {pageRows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell colSpan={7} className="text-center text-muted-foreground">
                   No bookings match these filters.
                 </TableCell>
               </TableRow>
@@ -266,6 +310,7 @@ export function ReportsRecords({
                 </TableCell>
                 <TableCell>{booking.hostel}</TableCell>
                 <TableCell>{booking.room}</TableCell>
+                <TableCell>{booking.session}</TableCell>
                 <TableCell className="text-right">{ghs(booking.amount)}</TableCell>
                 <TableCell>
                   <StatusBadge status={booking.status} />
@@ -281,6 +326,7 @@ export function ReportsRecords({
             ))}
           </TableBody>
         </Table>
+        </div>
 
         {totalPages > 1 && (
           <div className="flex items-center justify-between">

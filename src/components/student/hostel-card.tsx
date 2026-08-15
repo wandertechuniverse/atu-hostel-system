@@ -91,9 +91,9 @@ export function HostelCard({
         <p className="line-clamp-2">{hostel.description ?? "No description yet."}</p>
         <FacilityBadges facilities={hostel.facilities} />
       </CardContent>
-      <CardFooter className="flex items-center justify-between">
+      <CardFooter className="flex flex-wrap items-center justify-between gap-2">
         <span className="flex items-center gap-1.5 text-sm">
-          <BedDouble className="size-4 text-muted-foreground" />
+          <BedDouble className="size-4 shrink-0 text-muted-foreground" />
           {availableRooms.length} room{availableRooms.length === 1 ? "" : "s"} open
         </span>
         <div className="text-right">

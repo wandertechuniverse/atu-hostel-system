@@ -14,7 +14,7 @@ test("admin can open notifications and send a console test email", async ({
   await expect(
     page.getByRole("heading", { name: "Notifications" }),
   ).toBeVisible();
-  await expect(page.getByText("Email integration")).toBeVisible();
+  await expect(page.getByText("Email integration", { exact: true })).toBeVisible();
   await expect(page.getByText("Console (log only)")).toBeVisible();
   await expect(page.getByText("Booking request received")).toBeVisible();
 
@@ -23,7 +23,9 @@ test("admin can open notifications and send a console test email", async ({
 
   await page.getByLabel("Send test email to").fill("admin@atu.edu.gh");
   await page.getByRole("button", { name: "Send test" }).click();
-  await expect(page.getByText(/server log/i)).toBeVisible();
+  await expect(
+    page.getByText("Test message written to the server log", { exact: false }),
+  ).toBeVisible();
   await expect(page.getByText("email.test").first()).toBeVisible();
 });
 

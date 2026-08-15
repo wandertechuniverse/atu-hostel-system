@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { CsrfInput } from "@/components/csrf-input";
+import { toast } from "sonner";
 import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,7 +40,12 @@ export function EditUserDialog({ user }: { user: UserDraft }) {
   // Close after a successful save (the parent keys this component on the
   // user's updatedAt, so the remount picks up the fresh values).
   useEffect(() => {
-    if (state.ok) setOpen(false);
+    if (state.ok) {
+      toast.success("User updated");
+      setOpen(false);
+    } else if (state.error) {
+      toast.error(state.error);
+    }
   }, [state]);
 
   return (

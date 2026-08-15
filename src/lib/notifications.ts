@@ -200,7 +200,7 @@ export async function notifyBookingCreated(
       type: "booking.received.student",
       title: `Booking request received - ${ctx.hostelName}`,
       body: `Room ${ctx.roomNumber} (${ctx.roomType}) is pending review.`,
-      href: "/my-bookings",
+      href: "/student/bookings",
     },
     mailer,
   );
@@ -228,7 +228,7 @@ export async function notifyBookingApproved(
       type: "booking.approved.student",
       title: `Booking approved - ${ctx.hostelName}`,
       body: `Room ${ctx.roomNumber} is confirmed. You can submit payment.`,
-      href: "/my-bookings",
+      href: "/student/bookings",
     },
     mailer,
   );
@@ -246,7 +246,7 @@ export async function notifyBookingRejected(
       type: "booking.rejected.student",
       title: `Booking not approved - ${ctx.hostelName}`,
       body: `Your request for room ${ctx.roomNumber} was not approved.`,
-      href: "/my-bookings",
+      href: "/student/bookings",
     },
     mailer,
   );
@@ -282,7 +282,7 @@ export async function notifyPaymentVerified(
       type: "payment.verified.student",
       title: `Payment verified - ${ctx.hostelName}`,
       body: `Your payment for room ${ctx.roomNumber} has been verified.`,
-      href: "/my-bookings",
+      href: "/student/bookings",
     },
     mailer,
   );

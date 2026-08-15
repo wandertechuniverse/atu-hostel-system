@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { CsrfInput } from "@/components/csrf-input";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   verifyPaymentFormAction,
@@ -15,6 +16,15 @@ export function VerifyPaymentButton({ bookingId }: { bookingId: string }) {
     verifyPaymentFormAction,
     initial,
   );
+  const seen = useRef(false);
+  useEffect(() => {
+    if (!seen.current) {
+      seen.current = true;
+      return;
+    }
+    if (state.ok) toast.success("Payment verified");
+    else if (state.error) toast.error(state.error);
+  }, [state]);
 
   return (
     <form action={formAction} className="flex flex-col items-end gap-1">

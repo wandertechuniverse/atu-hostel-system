@@ -35,6 +35,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ExportCsvButton } from "@/components/admin/export-csv-button";
+import { MobileField, MobileRecord } from "@/components/mobile-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -345,6 +346,44 @@ export default async function AdminActivityPage({
           </form>
         </CardHeader>
         <CardContent>
+          <div className="space-y-3 lg:hidden">
+            {rows.length === 0 && (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                No activity matches this filter.
+              </p>
+            )}
+            {rows.map((log) => (
+              <MobileRecord key={log.id}>
+                <MobileField label="Event">
+                  <Badge variant={actionTone(log.action)}>{log.action}</Badge>
+                </MobileField>
+                <MobileField label="Time">{formatTime(log.createdAt)}</MobileField>
+                <MobileField label="Actor">
+                  {log.user ? (
+                    <>
+                      <p className="font-medium">{log.user.name}</p>
+                      <p className="text-xs text-muted-foreground break-all">
+                        {log.user.email}
+                      </p>
+                    </>
+                  ) : (
+                    "system"
+                  )}
+                </MobileField>
+                <MobileField label="Subject">
+                  {log.subjectType
+                    ? `${log.subjectType}: ${subjectLabel(log.subjectType, log.subjectId)}`
+                    : "-"}
+                </MobileField>
+                <MobileField label="IP">
+                  <span className="font-mono text-xs">
+                    {log.ipAddress ?? "-"}
+                  </span>
+                </MobileField>
+              </MobileRecord>
+            ))}
+          </div>
+          <div className="hidden min-w-0 overflow-x-auto lg:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -407,6 +446,7 @@ export default async function AdminActivityPage({
               ))}
             </TableBody>
           </Table>
+          </div>
 
           {totalPages > 1 && (
             <div className="mt-4 flex items-center justify-between">

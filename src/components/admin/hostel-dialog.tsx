@@ -61,6 +61,8 @@ export function HostelDialog({ hostel }: { hostel?: HostelDraft | null }) {
           : "It stays hidden from students until you publish it.",
       });
       setOpen(false);
+    } else if (state.error) {
+      toast.error(state.error);
     }
   }, [state, isEdit]);
 

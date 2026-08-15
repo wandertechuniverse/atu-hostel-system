@@ -51,6 +51,13 @@ export const metadata: Metadata = {
     description:
       "Search, compare and book rooms across ATU campus hostels and private hostels around Adabraka.",
   },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180" }],
+  },
 };
 
 export const viewport: Viewport = {
@@ -103,7 +110,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
         <TooltipProvider>{children}</TooltipProvider>
-        <Toaster position="top-center" richColors />
+        <Toaster
+          position="bottom-center"
+          richColors
+          offset="1.25rem"
+          mobileOffset="1.25rem"
+        />
       </body>
     </html>
   );

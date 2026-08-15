@@ -1,6 +1,20 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      {
+        source: "/my-bookings",
+        destination: "/student/bookings",
+        permanent: false,
+      },
+      {
+        source: "/profile",
+        destination: "/student/profile",
+        permanent: false,
+      },
+    ];
+  },
   // Pin Turbopack's project root to this directory: otherwise it scans upward,
   // finds a stray bun.lock in the user's home folder, and warns on every start.
   turbopack: { root: __dirname },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
+import { useCallback, useRef } from "react";
 import { CSRF_COOKIE, CSRF_FIELD } from "@/lib/csrf-constants";
 
 /** Read the double-submit CSRF JWT from document.cookie. */
@@ -22,34 +22,31 @@ export function readCsrfCookie(): string {
 /**
  * Hidden double-submit field.
  *
- * The proxy sets `hbms_csrf` on the response of the first navigation, so the
- * cookie is not available during SSR (request cookies are still empty). We
- * therefore fill the input on the client - and again on every submit - so
- * Server Actions always receive a non-empty matching token.
+ * The proxy sets `hbms_csrf` on the first navigation, so the cookie is empty
+ * during SSR. We fill the input when the field mounts (including sheet/dialog
+ * content that appears later) and again on submit.
  */
 export function CsrfInput() {
-  const ref = useRef<HTMLInputElement>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
-  useLayoutEffect(() => {
+  const attach = useCallback((el: HTMLInputElement | null) => {
+    cleanupRef.current?.();
+    cleanupRef.current = null;
+    if (!el) return;
+
     const apply = () => {
       const token = readCsrfCookie();
-      if (ref.current && token) {
-        ref.current.value = token;
-      }
+      if (token) el.value = token;
     };
-
     apply();
 
-    const form = ref.current?.form;
+    const form = el.form;
     if (!form) return;
 
-    // Capture phase so the value is set before the Server Action serializes FormData.
     form.addEventListener("submit", apply, true);
-    // Progressive / delayed cookie (proxy Set-Cookie after soft navigations).
     const interval = window.setInterval(apply, 500);
     const stop = window.setTimeout(() => window.clearInterval(interval), 5_000);
-
-    return () => {
+    cleanupRef.current = () => {
       form.removeEventListener("submit", apply, true);
       window.clearInterval(interval);
       window.clearTimeout(stop);
@@ -58,7 +55,7 @@ export function CsrfInput() {
 
   return (
     <input
-      ref={ref}
+      ref={attach}
       type="hidden"
       name={CSRF_FIELD}
       defaultValue=""

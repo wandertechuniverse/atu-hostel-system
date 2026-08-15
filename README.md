@@ -2,7 +2,7 @@
 
 Student hostel booking for Accra Technical University. Students search rooms, request a booking, and submit Mobile Money. Managers approve bookings and verify payments. Admins manage users, hostels, and notifications.
 
-Stack: Next.js 16, Prisma, Neon Postgres, iron-session.
+Stack: Next.js 16, Prisma, Postgres (local Prisma Postgres or Neon), iron-session.
 
 ## Setup
 
@@ -11,18 +11,29 @@ bun install
 cp .env.example .env
 ```
 
-Set `DATABASE_URL` (and optional `DIRECT_URL`) to a Neon Postgres database. Then:
+### Local database (recommended for `next dev`)
+
+Avoids Neon free-tier cold starts and connection timeouts:
 
 ```bash
-bun run db:setup
+bun run db:local          # start local Prisma Postgres (background)
+bun run db:setup          # push schema + seed demo accounts
 bun run dev
 ```
 
-Open http://localhost:3000
+Stop the local DB: `bun run db:local:stop`.
+
+`.env.example` already points `DATABASE_URL` / `DIRECT_URL` at
+`localhost:51214`. Neon URLs can stay commented for production deploys.
+
+### Neon (cloud)
+
+Set `DATABASE_URL` (pooled) and optional `DIRECT_URL` (direct) to a Neon
+Postgres database, then `bun run db:setup`.
 
 ## Demo accounts
 
-All seed passwords are `password`.
+All seed passwords are `Demo@ATU2026`.
 
 | Role | Email |
 |---|---|

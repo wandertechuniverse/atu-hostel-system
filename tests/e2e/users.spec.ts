@@ -59,9 +59,8 @@ test("admin creates a manager from the Add user dialog; they can log in", async 
   await dialog.getByLabel("Email").fill("efua.ama@hostel.test");
   await dialog.getByLabel("Phone").fill("0551112222");
 
-  // Role defaults to Student - switch to Manager in the Base UI select.
-  await dialog.getByRole("combobox").click();
-  await page.getByRole("option", { name: "Manager" }).click();
+  // Native <select> labelled "Role" (not a Base UI combobox).
+  await dialog.getByLabel("Role").selectOption({ label: "Manager" });
 
   await dialog.getByLabel("Password", { exact: true }).fill("secret123");
   await dialog.getByRole("button", { name: "Create account" }).click();

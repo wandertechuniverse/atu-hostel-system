@@ -9,17 +9,17 @@ test("manager sees only their own hostel's bookings and hostels", async ({
   page,
 }) => {
   await login(page, "manager@hostel.test");
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/manager$/);
 
   // Bookings: the campus manager owns ATU Main Campus - Kwame's pending request
   // is theirs; the two Al-Hassan bookings must not appear.
-  await page.goto("/admin/bookings");
+  await page.goto("/manager/bookings");
   await expect(page.getByRole("row", { name: /Kwame Mensah/ })).toBeVisible();
   await expect(page.getByRole("row", { name: /Ama Serwaa/ })).toHaveCount(0);
   await expect(page.getByRole("row", { name: /Yaw Boateng/ })).toHaveCount(0);
 
   // Hostels: only their own hostel, no Add button, no publish control.
-  await page.goto("/admin/hostels");
+  await page.goto("/manager/hostels");
   await expect(
     page.getByRole("row", { name: /ATU Main Campus Hostel/ }),
   ).toBeVisible();
@@ -33,10 +33,10 @@ test("manager sees only their own hostel's bookings and hostels", async ({
 test("manager cannot open admin-only screens", async ({ page }) => {
   await login(page, "manager@hostel.test");
   await page.goto("/admin/users");
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/manager$/);
   await page.goto("/admin/activity");
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/manager$/);
   await page.goto("/admin/notifications");
-  await expect(page).toHaveURL(/\/admin$|\/login/);
+  await expect(page).toHaveURL(/\/manager$|\/login/);
   await expect(page.getByRole("link", { name: "Notifications" })).toHaveCount(0);
 });

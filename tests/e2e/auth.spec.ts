@@ -62,7 +62,7 @@ test("change password: current password is verified, old stops working, new work
   await login(page, email, "original-pass");
   await expect(page).toHaveURL(/\/$/);
 
-  // The header link reaches the page (renders with button semantics via Base UI).
+  // Styled as a button; aria-label is "Change password" (visible text is short).
   await page.getByRole("button", { name: "Change password" }).click();
   await expect(page).toHaveURL(/\/change-password/);
 

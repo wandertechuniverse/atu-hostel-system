@@ -20,6 +20,12 @@ import {
 } from "@/components/ui/table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { BookingRowActions } from "@/components/admin/booking-row-actions";
+import {
+  MobileField,
+  MobileFieldRow,
+  MobileRecord,
+} from "@/components/mobile-fields";
+import { staffPath } from "@/lib/paths";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +84,7 @@ export default async function AdminBookingsPage({
   const countMap = Object.fromEntries(
     counts.map((c) => [c.status, c._count._all]),
   );
+  const base = staffPath(session.role, "/bookings");
 
   return (
     <div className="space-y-6">
@@ -92,7 +99,7 @@ export default async function AdminBookingsPage({
 
       <div className="flex flex-wrap gap-2">
         <Link
-          href="/admin/bookings"
+          href={base}
           className={`rounded-full border px-3 py-1 text-xs ${
             !status ? "bg-primary text-primary-foreground" : "hover:bg-muted"
           }`}
@@ -102,7 +109,7 @@ export default async function AdminBookingsPage({
         {STATUSES.map((s) => (
           <Link
             key={s}
-            href={`/admin/bookings?status=${s}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+            href={`${base}?status=${s}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
             className={`rounded-full border px-3 py-1 text-xs ${
               status === s
                 ? "bg-primary text-primary-foreground"
@@ -142,7 +149,7 @@ export default async function AdminBookingsPage({
             </button>
             {q && (
               <Link
-                href={status ? `/admin/bookings?status=${status}` : "/admin/bookings"}
+                href={status ? `${base}?status=${status}` : base}
                 className="text-xs text-muted-foreground underline-offset-4 hover:underline"
               >
                 Clear
@@ -151,6 +158,49 @@ export default async function AdminBookingsPage({
           </form>
         </CardHeader>
         <CardContent>
+          <div className="space-y-3 lg:hidden">
+            {bookings.length === 0 && (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                No booking requests match.
+              </p>
+            )}
+            {bookings.map((booking) => (
+              <MobileRecord key={booking.id}>
+                <MobileField label="Student">
+                  <p className="font-medium">{booking.user.name}</p>
+                  {booking.user.studentIdNumber ? (
+                    <p className="text-xs text-muted-foreground">
+                      {booking.user.studentIdNumber}
+                    </p>
+                  ) : null}
+                </MobileField>
+                <MobileField label="Hostel">{booking.room.hostel.name}</MobileField>
+                <MobileField label="Room">
+                  {booking.room.roomNumber} · {booking.room.roomType}
+                </MobileField>
+                <MobileField label="Session">{booking.academicSession}</MobileField>
+                <MobileField label="Amount">
+                  <span className="font-medium">
+                    GH₵ {booking.amount.toLocaleString()}
+                  </span>
+                </MobileField>
+                <MobileFieldRow>
+                  <MobileField label="Status">
+                    <StatusBadge status={booking.status} />
+                  </MobileField>
+                  <MobileField label="Payment">
+                    {booking.payment ? (
+                      <StatusBadge status={booking.payment.status} />
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </MobileField>
+                </MobileFieldRow>
+                <BookingRowActions booking={booking} />
+              </MobileRecord>
+            ))}
+          </div>
+          <div className="hidden min-w-0 overflow-x-auto lg:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -207,6 +257,7 @@ export default async function AdminBookingsPage({
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

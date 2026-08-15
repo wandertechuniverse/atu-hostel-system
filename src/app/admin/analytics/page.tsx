@@ -33,6 +33,8 @@ import {
 } from "@/components/admin/analytics-charts";
 import { AnalyticsLiveBar } from "@/components/admin/analytics-live";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { MobileField, MobileRecord } from "@/components/mobile-fields";
+import { staffPath } from "@/lib/paths";
 
 export const dynamic = "force-dynamic";
 
@@ -246,7 +248,7 @@ export default async function AdminAnalyticsPage({
             </CardDescription>
           </div>
           <Link
-            href="/admin/reports"
+            href={staffPath(session.role, "/reports")}
             className="text-xs text-primary underline-offset-4 hover:underline"
           >
             Full reports →
@@ -254,6 +256,25 @@ export default async function AdminAnalyticsPage({
         </CardHeader>
         <CardContent className="space-y-6">
           <HostelRevenueChart rows={data.revenueByHostel} />
+          <div className="space-y-3 lg:hidden">
+            {data.revenueByHostel.length === 0 && (
+              <p className="text-center text-sm text-muted-foreground">
+                No hostels in scope.
+              </p>
+            )}
+            {data.revenueByHostel.map((row) => (
+              <MobileRecord key={row.id}>
+                <MobileField label="Hostel">
+                  <p className="font-medium">{row.name}</p>
+                </MobileField>
+                <MobileField label="Confirmed">{row.confirmed}</MobileField>
+                <MobileField label="Revenue">
+                  <span className="font-medium">{ghs(row.revenue)}</span>
+                </MobileField>
+              </MobileRecord>
+            ))}
+          </div>
+          <div className="hidden min-w-0 overflow-x-auto lg:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -279,6 +300,7 @@ export default async function AdminAnalyticsPage({
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 

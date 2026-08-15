@@ -113,7 +113,7 @@ export default function ProspectusPage() {
             <li>Submit a booking request (accept rules + disclaimer).</li>
             <li>
               Track status under{" "}
-              <Link href="/my-bookings" className="text-primary underline-offset-4 hover:underline">
+              <Link href="/student/bookings" className="text-primary underline-offset-4 hover:underline">
                 My bookings
               </Link>
               ; pay after approval.

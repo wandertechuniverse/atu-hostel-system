@@ -139,7 +139,7 @@ export async function uploadHostelImage(
     );
   }
   if (!isWithinImageSizeLimit(file.size)) {
-    throw validationError("Image must be 5 MB or smaller.");
+    throw validationError("Image must be 10 MB or smaller.");
   }
   if (file.bytes.byteLength === 0) {
     throw validationError("The uploaded file is empty.");
@@ -175,6 +175,89 @@ export async function uploadHostelImage(
     userId: session.userId!,
     subjectType: "Hostel",
     subjectId: hostel.id,
+  });
+  return updated;
+}
+
+async function writeManagedImage(
+  ownerId: string,
+  currentPath: string | null,
+  file: { type: string | null; size: number; bytes: Uint8Array },
+) {
+  const extension = imageExtensionFor(file.type);
+  if (!extension) {
+    throw validationError("Unsupported image type - use JPEG, PNG or WebP.");
+  }
+  if (!isWithinImageSizeLimit(file.size)) {
+    throw validationError("Image must be 10 MB or smaller.");
+  }
+  if (file.bytes.byteLength === 0) {
+    throw validationError("The uploaded file is empty.");
+  }
+  const filename = buildImageFilename(ownerId, extension);
+  const uploadsDir = join(process.cwd(), "public", "hostels");
+  await writeFile(join(uploadsDir, filename), file.bytes);
+  if (shouldRemoveOnReplace(currentPath)) {
+    const previous = currentPath!.split("/").pop()!;
+    await unlink(join(uploadsDir, previous)).catch(() => {});
+  }
+  return `/hostels/${filename}`;
+}
+
+/** Replace a room photo (manager: own hostel; admin: any). */
+export async function uploadRoomImage(
+  session: SessionData,
+  roomId: string,
+  file: { type: string | null; size: number; bytes: Uint8Array },
+) {
+  const room = await db.room.findUnique({
+    where: { id: roomId },
+    select: { id: true, hostelId: true, featuredImage: true },
+  });
+  if (!room) throw notFoundError("Room not found.");
+  if (!canManageHostel(session, room.hostelId)) throw forbiddenError();
+
+  const path = await writeManagedImage(`room-${room.id}`, room.featuredImage, file);
+  const updated = await db.room.update({
+    where: { id: room.id },
+    data: { featuredImage: path },
+    select: { id: true, featuredImage: true },
+  });
+  await audit({
+    action: "room.image_uploaded",
+    userId: session.userId!,
+    subjectType: "Room",
+    subjectId: room.id,
+  });
+  return updated;
+}
+
+/** Remove a room photo (manager: own hostel; admin: any). Idempotent. */
+export async function removeRoomImage(session: SessionData, roomId: string) {
+  const room = await db.room.findUnique({
+    where: { id: roomId },
+    select: { id: true, hostelId: true, featuredImage: true },
+  });
+  if (!room) throw notFoundError("Room not found.");
+  if (!canManageHostel(session, room.hostelId)) throw forbiddenError();
+  if (!room.featuredImage) return room;
+
+  if (shouldRemoveOnReplace(room.featuredImage)) {
+    const file = uploadedFilename(room.featuredImage);
+    if (file) {
+      await unlink(join(process.cwd(), "public", "hostels", file)).catch(() => {});
+    }
+  }
+  const updated = await db.room.update({
+    where: { id: room.id },
+    data: { featuredImage: null },
+    select: { id: true, featuredImage: true },
+  });
+  await audit({
+    action: "room.image_removed",
+    userId: session.userId!,
+    subjectType: "Room",
+    subjectId: room.id,
   });
   return updated;
 }
@@ -549,6 +632,13 @@ export async function deleteRoom(session: SessionData, roomId: string) {
     throw conflictError(
       "This room has bookings and cannot be deleted - mark it CLOSED instead.",
     );
+  }
+
+  if (shouldRemoveOnReplace(room.featuredImage)) {
+    const file = uploadedFilename(room.featuredImage);
+    if (file) {
+      await unlink(join(process.cwd(), "public", "hostels", file)).catch(() => {});
+    }
   }
 
   await db.$transaction(async (tx) => {

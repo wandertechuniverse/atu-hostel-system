@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
+import { revalidateStaff } from "@/lib/revalidate-staff";
 import { requireCsrf } from "@/lib/csrf";
 import { errorMessage } from "@/lib/services/errors";
 import { approveBooking, rejectBooking, verifyPayment } from "@/lib/services/bookings";
@@ -35,9 +36,9 @@ export async function bookingAdminAction(
     return { ok: false, error: errorMessage(error) };
   }
 
-  revalidatePath("/admin/bookings");
-  revalidatePath("/admin/payments");
-  revalidatePath("/admin");
+  revalidateStaff("/bookings");
+  revalidateStaff("/payments");
+  revalidateStaff();
   return { ok: true };
 }
 
@@ -58,9 +59,9 @@ export async function verifyPaymentFormAction(
     return { ok: false, error: errorMessage(error) };
   }
 
-  revalidatePath("/admin/payments");
-  revalidatePath("/admin/bookings");
-  revalidatePath("/admin");
+  revalidateStaff("/payments");
+  revalidateStaff("/bookings");
+  revalidateStaff();
   return { ok: true };
 }
 
@@ -81,8 +82,8 @@ export async function toggleHostelApprovalFormAction(
     return { ok: false, error: errorMessage(error) };
   }
 
-  revalidatePath("/admin/hostels");
-  revalidatePath("/admin");
+  revalidateStaff("/hostels");
+  revalidateStaff();
   revalidatePath("/");
   return { ok: true };
 }

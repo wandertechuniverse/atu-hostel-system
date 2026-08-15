@@ -1,11 +1,12 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
+import { DEMO_PASSWORD } from "../../src/lib/demo-accounts";
 import { reseed } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
 test.beforeAll(() => reseed());
 
-async function loginAs(base: APIRequestContext, email: string, password = "password") {
+async function loginAs(base: APIRequestContext, email: string, password = DEMO_PASSWORD) {
   const res = await base.post("/api/auth/login", { data: { email, password } });
   expect(res.status()).toBe(200);
   return res.json();
@@ -417,7 +418,7 @@ test("database export over the API: admin only, passwords never included", async
 
   // Versioned snapshot with every collection present.
   expect(data.format).toBe("hbms-backup");
-  expect(data.version).toBe(1);
+  expect(data.version).toBe(2);
   expect(typeof data.exportedAt).toBe("string");
   expect(data.counts.users).toBe(data.users.length);
   expect(data.counts.hostels).toBe(data.hostels.length);
@@ -425,6 +426,7 @@ test("database export over the API: admin only, passwords never included", async
   expect(data.counts.bookings).toBe(data.bookings.length);
   expect(data.counts.payments).toBe(data.payments.length);
   expect(data.counts.activityLog).toBe(data.activityLog.length);
+  expect(data.counts.notifications).toBe(data.notifications.length);
 
   // Credential hygiene: no user row ever carries a password hash.
   for (const user of data.users) {

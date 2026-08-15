@@ -19,14 +19,61 @@ export async function listMyNotifications(
   userId: string,
   take = 8,
 ): Promise<{ items: InboxItem[]; unreadCount: number }> {
-  const [items, unreadCount] = await Promise.all([
-    db.notification.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      take,
-    }),
-    db.notification.count({ where: { userId, readAt: null } }),
-  ]);
+  // One round-trip even when the inbox is empty (counts CTE + left join).
+  type Row = {
+    unreadCount: number;
+    id: string | null;
+    type: string | null;
+    title: string | null;
+    body: string | null;
+    href: string | null;
+    emailTo: string | null;
+    delivery: string | null;
+    readAt: Date | null;
+    createdAt: Date | null;
+  };
+
+  const rows = await db.$queryRaw<Row[]>`
+    WITH counts AS (
+      SELECT count(*) FILTER (WHERE "readAt" IS NULL)::int AS "unreadCount"
+      FROM "Notification"
+      WHERE "userId" = ${userId}
+    ),
+    items AS (
+      SELECT
+        id,
+        type,
+        title,
+        body,
+        href,
+        "emailTo" AS "emailTo",
+        delivery,
+        "readAt" AS "readAt",
+        "createdAt" AS "createdAt"
+      FROM "Notification"
+      WHERE "userId" = ${userId}
+      ORDER BY "createdAt" DESC
+      LIMIT ${take}
+    )
+    SELECT c."unreadCount", i.*
+    FROM counts c
+    LEFT JOIN items i ON true
+  `;
+
+  const unreadCount = rows[0]?.unreadCount ?? 0;
+  const items: InboxItem[] = rows
+    .filter((r): r is Row & { id: string } => r.id != null)
+    .map((r) => ({
+      id: r.id,
+      type: r.type ?? "",
+      title: r.title ?? "",
+      body: r.body ?? "",
+      href: r.href,
+      emailTo: r.emailTo,
+      delivery: r.delivery ?? "logged",
+      readAt: r.readAt,
+      createdAt: r.createdAt ?? new Date(0),
+    }));
   return { items, unreadCount };
 }
 

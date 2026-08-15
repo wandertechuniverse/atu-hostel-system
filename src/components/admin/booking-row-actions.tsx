@@ -39,15 +39,15 @@ export function BookingRowActions({ booking }: { booking: RowBooking }) {
   const canVerify = booking.payment?.status !== "SUCCESS";
 
   return (
-    <form action={formAction} className="flex flex-col items-end gap-1">
+    <form action={formAction} className="flex flex-col gap-1">
       <CsrfInput />
       <input type="hidden" name="bookingId" value={booking.id} />
       {state && "error" in state && state.error && (
-        <p className="text-right text-xs text-destructive" role="alert">
+        <p className="text-xs text-destructive" role="alert">
           {state.error}
         </p>
       )}
-      <div className="flex items-center justify-end gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         {isPending && (
           <Button
             type="submit"

@@ -1,12 +1,8 @@
 import "server-only";
 
+import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import type { SessionData } from "@/lib/session";
-import {
-  bookingScopeWhere,
-  hostelScopeWhere,
-  paymentScopeWhere,
-} from "@/lib/scoping";
 
 export type DayPoint = { date: string; label: string; count: number; amount: number };
 
@@ -53,9 +49,33 @@ function emptyTrend(days: number): DayPoint[] {
   return out;
 }
 
+type KpiRow = {
+  students: number;
+  hostels: number;
+  rooms: number;
+  confirmedBookings: number;
+  pendingBookings: number;
+  cancelledBookings: number;
+  completedBookings: number;
+  totalBeds: number;
+  revenue: number;
+  pendingPayments: number;
+  successPayments: number;
+  failedPayments: number;
+  failedLogins7d: number;
+  activityToday: number;
+};
+
+type StatusCount = { status: string; count: number };
+type HostelRev = { id: string; name: string; revenue: number; confirmed: number };
+type ActionCount = { action: string; count: number };
+
 /**
- * Role-scoped analytics for the admin dashboard (FR-8).
- * Managers only see their hostel; admins see the whole institution.
+ * Role-scoped analytics (FR-8). Managers only see their hostel.
+ *
+ * Previous implementation fired ~16 parallel Prisma queries. Against Neon
+ * from a high-RTT network that serialises through the pooler and costs
+ * multi-seconds. This version uses a small number of multi-aggregate SQLs.
  */
 export async function getAnalytics(
   session: SessionData,
@@ -67,209 +87,218 @@ export async function getAnalytics(
   since.setUTCHours(0, 0, 0, 0);
 
   const isManager = session.role === "MANAGER";
-  const bookingWhere = bookingScopeWhere(session);
-  const hostelWhere = hostelScopeWhere(session);
-  const paymentWhere = paymentScopeWhere(session);
+  const hostelId = session.hostelId ?? "__none__";
+  const startOfToday = new Date();
+  startOfToday.setUTCHours(0, 0, 0, 0);
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-  const [
-    students,
-    hostelCount,
-    rooms,
-    confirmedBookings,
-    pendingBookings,
-    pendingPayments,
-    bedsAgg,
-    revenueRows,
-    statusGroups,
-    paymentGroups,
-    recentBookings,
-    successPayments,
-    failedLogins7d,
-    activityToday,
-    recentActions,
-    hostelsWithRooms,
-  ] = await Promise.all([
-    isManager
-      ? db.booking
-          .findMany({
-            where: bookingWhere,
-            distinct: ["userId"],
-            select: { userId: true },
-          })
-          .then((r) => r.length)
-      : db.user.count({ where: { role: "STUDENT" } }),
-    db.hostel.count({ where: hostelWhere }),
-    db.room.count({
-      where: isManager
-        ? { hostelId: session.hostelId ?? "__none__" }
-        : {},
-    }),
-    db.booking.count({ where: { ...bookingWhere, status: "CONFIRMED" } }),
-    db.booking.count({ where: { ...bookingWhere, status: "PENDING" } }),
-    db.payment.count({ where: { ...paymentWhere, status: "PENDING" } }),
-    db.room.aggregate({
-      where: isManager
-        ? { hostelId: session.hostelId ?? "__none__" }
-        : {},
-      _sum: { capacity: true },
-    }),
-    db.booking.findMany({
-      where: {
-        ...bookingWhere,
-        payment: { status: "SUCCESS" },
-      },
-      select: {
-        amount: true,
-        room: { select: { hostelId: true, hostel: { select: { name: true } } } },
-      },
-    }),
-    db.booking.groupBy({
-      by: ["status"],
-      where: bookingWhere,
-      _count: { _all: true },
-    }),
-    db.payment.groupBy({
-      by: ["status"],
-      where: paymentWhere,
-      _count: { _all: true },
-    }),
-    db.booking.findMany({
-      where: { ...bookingWhere, createdAt: { gte: since } },
-      select: { createdAt: true, amount: true },
-      orderBy: { createdAt: "asc" },
-    }),
-    db.payment.findMany({
-      where: {
-        ...paymentWhere,
-        status: "SUCCESS",
-        createdAt: { gte: since },
-      },
-      select: { amountPaid: true, createdAt: true, paymentDate: true },
-    }),
-    isManager
-      ? Promise.resolve(0)
-      : db.activityLog.count({
-          where: {
-            action: { in: ["auth.login_failed", "auth.rate_limited"] },
-            createdAt: {
-              gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-            },
-          },
-        }),
-    isManager
-      ? Promise.resolve(0)
-      : db.activityLog.count({
-          where: {
-            createdAt: {
-              gte: new Date(new Date().setUTCHours(0, 0, 0, 0)),
-            },
-          },
-        }),
-    isManager
-      ? Promise.resolve([] as { action: string; _count: { _all: number } }[])
-      : db.activityLog
-          .groupBy({
-            by: ["action"],
-            where: { createdAt: { gte: since } },
-            _count: { _all: true },
-          })
-          .then((rows) =>
-            rows
-              .sort((a, b) => b._count._all - a._count._all)
-              .slice(0, 8),
-          ),
-    db.hostel.findMany({
-      where: hostelWhere,
-      select: {
-        id: true,
-        name: true,
-        rooms: {
-          select: {
-            capacity: true,
-            bookings: {
-              where: { status: "CONFIRMED" },
-              select: { id: true },
-            },
-          },
-        },
-      },
-      orderBy: { name: "asc" },
-    }),
-  ]);
+  // Room/booking/payment scope fragments for manager vs admin.
+  const roomScope = isManager
+    ? Prisma.sql`r."hostelId" = ${hostelId}`
+    : Prisma.sql`true`;
+  const bookingScope = isManager
+    ? Prisma.sql`r."hostelId" = ${hostelId}`
+    : Prisma.sql`true`;
+  const paymentScope = isManager
+    ? Prisma.sql`r."hostelId" = ${hostelId}`
+    : Prisma.sql`true`;
+  const hostelScope = isManager
+    ? Prisma.sql`h.id = ${hostelId}`
+    : Prisma.sql`true`;
 
-  const totalBeds = bedsAgg._sum.capacity ?? 0;
+  const [kpiRows, hostelRows, bookingTrendRows, paymentTrendRows, topActionRows] =
+    await Promise.all([
+      db.$queryRaw<KpiRow[]>`
+        SELECT
+          ${
+            isManager
+              ? Prisma.sql`(
+                  SELECT count(DISTINCT b."userId")::int
+                  FROM "Booking" b
+                  JOIN "Room" r ON r.id = b."roomId"
+                  WHERE r."hostelId" = ${hostelId}
+                )`
+              : Prisma.sql`(SELECT count(*)::int FROM "User" WHERE role = 'STUDENT')`
+          } AS students,
+          (SELECT count(*)::int FROM "Hostel" h WHERE ${hostelScope}) AS hostels,
+          (SELECT count(*)::int FROM "Room" r WHERE ${roomScope}) AS rooms,
+          (SELECT count(*)::int FROM "Booking" b
+             JOIN "Room" r ON r.id = b."roomId"
+            WHERE ${bookingScope} AND b.status = 'CONFIRMED') AS "confirmedBookings",
+          (SELECT count(*)::int FROM "Booking" b
+             JOIN "Room" r ON r.id = b."roomId"
+            WHERE ${bookingScope} AND b.status = 'PENDING') AS "pendingBookings",
+          (SELECT count(*)::int FROM "Booking" b
+             JOIN "Room" r ON r.id = b."roomId"
+            WHERE ${bookingScope} AND b.status = 'CANCELLED') AS "cancelledBookings",
+          (SELECT count(*)::int FROM "Booking" b
+             JOIN "Room" r ON r.id = b."roomId"
+            WHERE ${bookingScope} AND b.status = 'COMPLETED') AS "completedBookings",
+          (SELECT coalesce(sum(r.capacity), 0)::int FROM "Room" r WHERE ${roomScope}) AS "totalBeds",
+          (SELECT coalesce(sum(b.amount), 0)::float FROM "Booking" b
+             JOIN "Room" r ON r.id = b."roomId"
+             JOIN "Payment" p ON p."bookingId" = b.id
+            WHERE ${bookingScope} AND p.status = 'SUCCESS') AS revenue,
+          (SELECT count(*)::int FROM "Payment" p
+             JOIN "Booking" b ON b.id = p."bookingId"
+             JOIN "Room" r ON r.id = b."roomId"
+            WHERE ${paymentScope} AND p.status = 'PENDING') AS "pendingPayments",
+          (SELECT count(*)::int FROM "Payment" p
+             JOIN "Booking" b ON b.id = p."bookingId"
+             JOIN "Room" r ON r.id = b."roomId"
+            WHERE ${paymentScope} AND p.status = 'SUCCESS') AS "successPayments",
+          (SELECT count(*)::int FROM "Payment" p
+             JOIN "Booking" b ON b.id = p."bookingId"
+             JOIN "Room" r ON r.id = b."roomId"
+            WHERE ${paymentScope} AND p.status = 'FAILED') AS "failedPayments",
+          ${
+            isManager
+              ? Prisma.sql`0`
+              : Prisma.sql`(
+                  SELECT count(*)::int FROM "ActivityLog"
+                  WHERE action IN ('auth.login_failed', 'auth.rate_limited')
+                    AND "createdAt" >= ${weekAgo}
+                )`
+          } AS "failedLogins7d",
+          ${
+            isManager
+              ? Prisma.sql`0`
+              : Prisma.sql`(
+                  SELECT count(*)::int FROM "ActivityLog"
+                  WHERE "createdAt" >= ${startOfToday}
+                )`
+          } AS "activityToday"
+      `,
+      db.$queryRaw<HostelRev[]>`
+        SELECT
+          h.id,
+          h.name,
+          coalesce(sum(b.amount) FILTER (WHERE p.status = 'SUCCESS'), 0)::float AS revenue,
+          count(b.id) FILTER (WHERE b.status = 'CONFIRMED')::int AS confirmed
+        FROM "Hostel" h
+        LEFT JOIN "Room" r ON r."hostelId" = h.id
+        LEFT JOIN "Booking" b ON b."roomId" = r.id
+        LEFT JOIN "Payment" p ON p."bookingId" = b.id
+        WHERE ${hostelScope}
+        GROUP BY h.id, h.name
+        ORDER BY revenue DESC
+      `,
+      db.$queryRaw<{ day: Date; count: number; amount: number }[]>`
+        SELECT date_trunc('day', b."createdAt") AS day,
+               count(*)::int AS count,
+               coalesce(sum(b.amount), 0)::float AS amount
+        FROM "Booking" b
+        JOIN "Room" r ON r.id = b."roomId"
+        WHERE ${bookingScope} AND b."createdAt" >= ${since}
+        GROUP BY 1
+        ORDER BY 1
+      `,
+      db.$queryRaw<{ day: Date; count: number; amount: number }[]>`
+        SELECT date_trunc('day', coalesce(p."paymentDate", p."createdAt")) AS day,
+               count(*)::int AS count,
+               coalesce(sum(p."amountPaid"), 0)::float AS amount
+        FROM "Payment" p
+        JOIN "Booking" b ON b.id = p."bookingId"
+        JOIN "Room" r ON r.id = b."roomId"
+        WHERE ${paymentScope}
+          AND p.status = 'SUCCESS'
+          AND coalesce(p."paymentDate", p."createdAt") >= ${since}
+        GROUP BY 1
+        ORDER BY 1
+      `,
+      isManager
+        ? Promise.resolve([] as ActionCount[])
+        : db.$queryRaw<ActionCount[]>`
+            SELECT action, count(*)::int AS count
+            FROM "ActivityLog"
+            WHERE "createdAt" >= ${since}
+            GROUP BY action
+            ORDER BY count DESC
+            LIMIT 8
+          `,
+    ]);
+
+  const k = kpiRows[0] ?? {
+    students: 0,
+    hostels: 0,
+    rooms: 0,
+    confirmedBookings: 0,
+    pendingBookings: 0,
+    cancelledBookings: 0,
+    completedBookings: 0,
+    totalBeds: 0,
+    revenue: 0,
+    pendingPayments: 0,
+    successPayments: 0,
+    failedPayments: 0,
+    failedLogins7d: 0,
+    activityToday: 0,
+  };
+
   const occupancyPct =
-    totalBeds > 0 ? Math.round((confirmedBookings / totalBeds) * 100) : 0;
-  const revenue = revenueRows.reduce((s, b) => s + b.amount, 0);
+    k.totalBeds > 0
+      ? Math.round((k.confirmedBookings / k.totalBeds) * 100)
+      : 0;
 
-  const byHostel = new Map<string, { name: string; revenue: number; confirmed: number }>();
-  for (const h of hostelsWithRooms) {
-    const confirmed = h.rooms.reduce((s, r) => s + r.bookings.length, 0);
-    byHostel.set(h.id, { name: h.name, revenue: 0, confirmed });
-  }
-  for (const row of revenueRows) {
-    const id = row.room.hostelId;
-    const cur = byHostel.get(id) ?? {
-      name: row.room.hostel.name,
-      revenue: 0,
-      confirmed: 0,
-    };
-    cur.revenue += row.amount;
-    byHostel.set(id, cur);
-  }
+  const bookingsByStatus: StatusCount[] = [
+    { status: "PENDING", count: k.pendingBookings },
+    { status: "CONFIRMED", count: k.confirmedBookings },
+    { status: "CANCELLED", count: k.cancelledBookings },
+    { status: "COMPLETED", count: k.completedBookings },
+  ].filter((s) => s.count > 0);
+
+  const paymentsByStatus: StatusCount[] = [
+    { status: "PENDING", count: k.pendingPayments },
+    { status: "SUCCESS", count: k.successPayments },
+    { status: "FAILED", count: k.failedPayments },
+  ].filter((s) => s.count > 0);
 
   const bookingTrend = emptyTrend(days);
   const bookingIndex = new Map(bookingTrend.map((p, i) => [p.date, i]));
-  for (const b of recentBookings) {
-    const key = dayKey(b.createdAt);
+  for (const row of bookingTrendRows) {
+    const key = dayKey(new Date(row.day));
     const idx = bookingIndex.get(key);
     if (idx !== undefined) {
-      bookingTrend[idx].count += 1;
-      bookingTrend[idx].amount += b.amount;
+      bookingTrend[idx].count = row.count;
+      bookingTrend[idx].amount = row.amount;
     }
   }
 
   const revenueTrend = emptyTrend(days);
   const revenueIndex = new Map(revenueTrend.map((p, i) => [p.date, i]));
-  for (const p of successPayments) {
-    const when = p.paymentDate ?? p.createdAt;
-    const key = dayKey(when);
+  for (const row of paymentTrendRows) {
+    const key = dayKey(new Date(row.day));
     const idx = revenueIndex.get(key);
     if (idx !== undefined) {
-      revenueTrend[idx].count += 1;
-      revenueTrend[idx].amount += p.amountPaid;
+      revenueTrend[idx].count = row.count;
+      revenueTrend[idx].amount = row.amount;
     }
   }
 
   return {
     rangeDays: days,
     kpis: {
-      students,
-      hostels: hostelCount,
-      rooms,
-      confirmedBookings,
-      pendingBookings,
+      students: k.students,
+      hostels: k.hostels,
+      rooms: k.rooms,
+      confirmedBookings: k.confirmedBookings,
+      pendingBookings: k.pendingBookings,
       occupancyPct,
-      revenue,
-      pendingPayments,
-      failedLogins7d,
-      activityToday,
+      revenue: k.revenue,
+      pendingPayments: k.pendingPayments,
+      failedLogins7d: k.failedLogins7d,
+      activityToday: k.activityToday,
     },
-    bookingsByStatus: statusGroups.map((g) => ({
-      status: g.status,
-      count: g._count._all,
+    bookingsByStatus,
+    paymentsByStatus,
+    revenueByHostel: hostelRows.map((h) => ({
+      id: h.id,
+      name: h.name,
+      revenue: h.revenue,
+      confirmed: h.confirmed,
     })),
-    paymentsByStatus: paymentGroups.map((g) => ({
-      status: g.status,
-      count: g._count._all,
-    })),
-    revenueByHostel: [...byHostel.entries()]
-      .map(([id, v]) => ({ id, name: v.name, revenue: v.revenue, confirmed: v.confirmed }))
-      .sort((a, b) => b.revenue - a.revenue),
     bookingTrend,
     revenueTrend,
-    topActions: (recentActions as { action: string; _count: { _all: number } }[]).map(
-      (a) => ({ action: a.action, count: a._count._all }),
-    ),
+    topActions: topActionRows,
   };
 }

@@ -5,8 +5,14 @@ import { SignJWT, jwtVerify } from "jose";
 import {
   sessionOptions,
   isStaffRole,
+  resolveSessionSecret,
   type SessionData,
 } from "@/lib/session";
+import {
+  isSharedStaffSection,
+  staffSection,
+  swapStaffPrefix,
+} from "@/lib/paths";
 import {
   basicAuthChallenge,
   basicAuthEnabled,
@@ -25,7 +31,7 @@ const CSRF_MAX_AGE = 60 * 60 * 2; // 2 hours
 
 function secretKey(): Uint8Array {
   return new TextEncoder().encode(
-    process.env.SESSION_SECRET ?? "dev-only-secret-change-me",
+    resolveSessionSecret(),
   );
 }
 
@@ -64,8 +70,14 @@ function setCsrfCookie(response: NextResponse, token: string) {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Optional second factor for the entire admin surface (env-gated).
-  if (pathname.startsWith("/admin") && basicAuthEnabled()) {
+  const isStaffPath =
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
+    pathname === "/manager" ||
+    pathname.startsWith("/manager/");
+
+  // Optional second factor for the staff surfaces (env-gated).
+  if (isStaffPath && basicAuthEnabled()) {
     if (!verifyBasicAuthHeader(request.headers.get("authorization"))) {
       return basicAuthChallenge();
     }
@@ -79,8 +91,8 @@ export async function proxy(request: NextRequest) {
     setCsrfCookie(response, await mintCsrfJwt());
   }
 
-  // Staff session gate for /admin (role re-checked on every page/action).
-  if (pathname.startsWith("/admin")) {
+  // Staff session gate for /admin and /manager (role re-checked on every page).
+  if (isStaffPath) {
     const session = await getIronSession<SessionData>(
       request,
       response,
@@ -101,6 +113,20 @@ export async function proxy(request: NextRequest) {
         });
       }
       return redirect;
+    }
+
+    const search = request.nextUrl.search;
+    if (session.role === "MANAGER" && pathname.startsWith("/admin")) {
+      const section = staffSection(pathname);
+      const dest = isSharedStaffSection(section)
+        ? `${swapStaffPrefix(pathname, "/manager")}${search}`
+        : `/manager${search}`;
+      return NextResponse.redirect(new URL(dest, request.url));
+    }
+    if (session.role === "ADMIN" && pathname.startsWith("/manager")) {
+      return NextResponse.redirect(
+        new URL(`${swapStaffPrefix(pathname, "/admin")}${search}`, request.url),
+      );
     }
   }
 

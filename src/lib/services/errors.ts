@@ -47,6 +47,17 @@ export const rateLimitedError = (message: string) => new AppError("RATE_LIMITED"
 /** Human-friendly message for form rendering (mirrors the old action helpers). */
 export function errorMessage(error: unknown): string {
   if (error instanceof AppError) return error.message;
-  if (error instanceof Error) return error.message;
+  if (error instanceof Error) {
+    // Never surface framework control-flow digests (redirect / notFound).
+    const msg = error.message || "";
+    if (
+      msg.includes("NEXT_REDIRECT") ||
+      msg.includes("NEXT_NOT_FOUND") ||
+      (error as { digest?: string }).digest?.startsWith("NEXT_")
+    ) {
+      return "Something went wrong. Try again.";
+    }
+    return msg || "Something went wrong. Try again.";
+  }
   return "Something went wrong. Try again.";
 }

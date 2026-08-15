@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { db } from "@/lib/db";
+import { formatDbError, withDbReadRetry } from "@/lib/db-errors";
 import { ViewToggle } from "@/components/student/view-toggle";
 import { isRoomBookable } from "@/lib/availability";
 
@@ -26,6 +28,20 @@ const PRICE_BUCKETS = [
   { value: "6000", label: "Up to GH₵ 6,000" },
 ];
 
+function loadApprovedHostels() {
+  return db.hostel.findMany({
+    where: { isApproved: true },
+    include: {
+      rooms: {
+        include: {
+          bookings: { where: { status: "CONFIRMED" }, select: { id: true } },
+        },
+      },
+    },
+    orderBy: { name: "asc" },
+  });
+}
+
 export default async function Home({
   searchParams,
 }: {
@@ -37,17 +53,16 @@ export default async function Home({
   const maxPrice = Number(sp.maxPrice) > 0 ? Number(sp.maxPrice) : null;
   const hasFilters = Boolean(q || type || maxPrice);
 
-  const hostels = await db.hostel.findMany({
-    where: { isApproved: true },
-    include: {
-      rooms: {
-        include: {
-          bookings: { where: { status: "CONFIRMED" }, select: { id: true } },
-        },
-      },
-    },
-    orderBy: { name: "asc" },
-  });
+  let hostels: Awaited<ReturnType<typeof loadApprovedHostels>> = [];
+  let dbError: string | null = null;
+
+  try {
+    hostels = await withDbReadRetry("home.hostels", loadApprovedHostels);
+  } catch (error) {
+    // Neon free compute / idle pool drops must not 500 the public home page.
+    dbError = formatDbError(error);
+    console.error("[home] hostel list failed:", dbError);
+  }
 
   const qLower = q.toLowerCase();
   const filtered = hostels.filter((hostel) => {
@@ -96,6 +111,26 @@ export default async function Home({
           </span>
         </div>
       </section>
+
+      {dbError && (
+        <div
+          role="alert"
+          className="mb-6 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100"
+        >
+          <p className="font-medium">Could not load hostels right now</p>
+          <p className="mt-1 text-amber-800/90 dark:text-amber-200/90">
+            {/localhost|127\.0\.0\.1|econnrefused/i.test(dbError)
+              ? "Local database is not running. In a terminal: bun run db:local  then  bun run db:seed  and click Retry."
+              : "The database is waking up or briefly unreachable. Wait a few seconds and try again."}
+          </p>
+          <Link
+            href="/"
+            className="mt-3 inline-flex h-8 items-center rounded-md bg-amber-600 px-3 text-xs font-medium text-white hover:bg-amber-700"
+          >
+            Retry
+          </Link>
+        </div>
+      )}
 
       {/* Plain GET form - filters live in the URL, no client JS needed. */}
       <form
@@ -181,13 +216,13 @@ export default async function Home({
         </div>
       </form>
 
-      {hasFilters && (
+      {hasFilters && !dbError && (
         <p className="mb-4 text-sm text-muted-foreground">
           {filtered.length} of {hostels.length} hostels match your filters.
         </p>
       )}
 
-      <ViewToggle hostels={filtered} />
+      {!dbError && <ViewToggle hostels={filtered} />}
     </main>
   );
 }

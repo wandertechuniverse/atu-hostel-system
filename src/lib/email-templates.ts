@@ -70,7 +70,7 @@ export function bookingTemplateVariables(
     paymentReference: ctx.paymentReference ?? "",
     managerName: ctx.managerName ?? "",
     siteUrl: origin,
-    myBookingsUrl: `${origin}/my-bookings`,
+    myBookingsUrl: `${origin}/student/bookings`,
     adminBookingsUrl: `${origin}/admin/bookings`,
     adminPaymentsUrl: `${origin}/admin/payments`,
   };
@@ -155,7 +155,7 @@ export function passwordResetEmail(to: string, url: string): EmailMessage {
 export function bookingReceivedStudentEmail(
   ctx: BookingNotifyContext,
 ): EmailMessage {
-  const myBookings = `${ctx.siteUrl ?? siteBase()}/my-bookings`;
+  const myBookings = `${ctx.siteUrl ?? siteBase()}/student/bookings`;
   return {
     templateVariables: bookingTemplateVariables(ctx),
     to: ctx.studentEmail,
@@ -224,7 +224,7 @@ export function bookingCreatedStaffEmail(
 export function bookingApprovedStudentEmail(
   ctx: BookingNotifyContext,
 ): EmailMessage {
-  const myBookings = `${ctx.siteUrl ?? siteBase()}/my-bookings`;
+  const myBookings = `${ctx.siteUrl ?? siteBase()}/student/bookings`;
   return {
     templateVariables: bookingTemplateVariables(ctx),
     to: ctx.studentEmail,
@@ -253,7 +253,7 @@ export function bookingApprovedStudentEmail(
 export function bookingRejectedStudentEmail(
   ctx: BookingNotifyContext,
 ): EmailMessage {
-  const myBookings = `${ctx.siteUrl ?? siteBase()}/my-bookings`;
+  const myBookings = `${ctx.siteUrl ?? siteBase()}/student/bookings`;
   return {
     templateVariables: bookingTemplateVariables(ctx),
     to: ctx.studentEmail,
@@ -312,7 +312,7 @@ export function paymentSubmittedStaffEmail(
 export function paymentVerifiedStudentEmail(
   ctx: BookingNotifyContext,
 ): EmailMessage {
-  const myBookings = `${ctx.siteUrl ?? siteBase()}/my-bookings`;
+  const myBookings = `${ctx.siteUrl ?? siteBase()}/student/bookings`;
   return {
     templateVariables: bookingTemplateVariables(ctx),
     to: ctx.studentEmail,
@@ -429,7 +429,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventSpec[] = [
     label: "Booking request received",
     audience: "Student",
     trigger: "A student submits a room booking",
-    href: "/my-bookings",
+    href: "/student/bookings",
   },
   {
     id: "booking.created.staff",
@@ -443,14 +443,14 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventSpec[] = [
     label: "Booking approved",
     audience: "Student",
     trigger: "A manager or admin approves a request",
-    href: "/my-bookings",
+    href: "/student/bookings",
   },
   {
     id: "booking.rejected.student",
     label: "Booking not approved",
     audience: "Student",
     trigger: "A manager or admin rejects a request",
-    href: "/my-bookings",
+    href: "/student/bookings",
   },
   {
     id: "payment.submitted.staff",
@@ -464,7 +464,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventSpec[] = [
     label: "Payment verified",
     audience: "Student",
     trigger: "A manager or admin verifies a payment",
-    href: "/my-bookings",
+    href: "/student/bookings",
   },
   {
     id: "auth.password_reset",

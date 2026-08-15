@@ -95,7 +95,7 @@ describe("Mailtrap template bindings", () => {
   it("exposes Handlebars fields for a booking template", () => {
     const vars = bookingTemplateVariables(base);
     expect(vars.studentName).toBe("Ama Mensah");
-    expect(vars.myBookingsUrl).toBe("https://hbms.example/my-bookings");
+    expect(vars.myBookingsUrl).toBe("https://hbms.example/student/bookings");
     expect(vars.amountFormatted).toContain("2,500");
   });
 });
@@ -146,7 +146,7 @@ describe("booking / payment templates", () => {
     expect(msg.to).toBe(base.studentEmail);
     expect(msg.subject).toContain("Campus Hostel A");
     expect(msg.text).toContain("PENDING");
-    expect(msg.text).toContain("https://hbms.example/my-bookings");
+    expect(msg.text).toContain("https://hbms.example/student/bookings");
   });
 
   it("alerts the hostel manager about a new booking", () => {
@@ -196,6 +196,6 @@ describe("booking / payment templates", () => {
     expect(msg.to).toBe(base.studentEmail);
     expect(msg.subject).toMatch(/verified/i);
     expect(msg.text).toContain("PAY-ABCD");
-    expect(msg.text).toContain("/my-bookings");
+    expect(msg.text).toContain("/student/bookings");
   });
 });

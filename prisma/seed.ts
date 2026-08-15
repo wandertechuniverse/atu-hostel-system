@@ -3,6 +3,7 @@
 // from Wikimedia Commons, CC BY-SA 4.0 - see docs/14-image-credits.md.
 import "dotenv/config";
 import bcrypt from "bcryptjs";
+import { DEMO_PASSWORD } from "../src/lib/demo-accounts";
 import { createPrismaClient } from "../src/lib/prisma-client";
 
 const db = createPrismaClient();
@@ -16,7 +17,7 @@ async function main() {
   await db.hostel.deleteMany();
   await db.user.deleteMany();
 
-  const password = await bcrypt.hash("password", 12);
+  const password = await bcrypt.hash(DEMO_PASSWORD, 12);
 
   const [admin, managerCampus, managerAlHassan, student1, student2, student3] =
     await Promise.all([
@@ -305,7 +306,9 @@ async function main() {
   });
 
   console.log("Seeded:");
-  console.log("  Users:        admin, 2 managers, 3 students (password: password)");
+  console.log(
+    `  Users:        admin, 2 managers, 3 students (password: ${DEMO_PASSWORD})`,
+  );
   console.log("  Hostels:      4 (1 university, 3 private), all approved");
   console.log("  Rooms:        10, incl. one full (302) and one in maintenance (103)");
   console.log("  Prices:       GH₵ 3,500 – 6,000 per academic year");
